@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walter Procedure Builder</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1f2328; --muted: #6a6f76; --line: #dcdad4;
+    --accent: #2f6f4f; --accent-ink: #ffffff; --warn: #9a5b00; --bad: #b42318; --sel: #e7f1eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181b; --panel: #1f2226; --ink: #e8e6e1; --muted: #9aa0a6; --line: #33373c;
+      --accent: #5fae86; --accent-ink: #0f1a14; --warn: #e0a440; --bad: #f07a6e; --sel: #24332b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; }
+  input, select, button { font: inherit; color: inherit; }
+  input, select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  button { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.danger { color: var(--bad); border-color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: 220px 1fr 300px; gap: 12px; padding: 12px 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+  .skill { display: block; width: 100%; text-align: left; margin-bottom: 6px; }
+  .skill small { display: block; color: var(--muted); }
+  ol.steps { list-style: none; margin: 0; padding: 0; }
+  ol.steps li { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 6px; cursor: pointer; }
+  ol.steps li.sel { background: var(--sel); border-color: var(--accent); }
+  ol.steps .n { color: var(--muted); width: 22px; text-align: right; }
+  ol.steps .what { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ol.steps .what b { margin-right: 6px; }
+  ol.steps button { padding: 2px 6px; }
+  label { display: block; margin-bottom: 10px; }
+  label span { display: block; font-size: 12px; color: var(--muted); }
+  label input:not([type=checkbox]), label select { width: 100%; }
+  #msg { margin: 0 16px; padding: 8px 12px; border-radius: 6px; display: none; }
+  #msg.ok { display: block; background: var(--sel); }
+  #msg.err { display: block; border: 1px solid var(--bad); color: var(--bad); }
+  #log { margin: 0 16px 16px; }
+  #log table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #log td { padding: 3px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  #log tr.bad td { color: var(--bad); } #log tr.prompt td { color: var(--warn); font-weight: 600; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Walter procedure builder</h1>
+  <select id="load"><option value="">Open…</option></select>
+  <input id="name" placeholder="procedure_name" size="18">
+  <button id="new">New</button>
+  <button id="check">Check</button>
+  <button id="save" class="primary">Save</button>
+  <span class="spacer"></span>
+  <select id="speed" title="Speed scale"><option>0.3</option><option selected>0.5</option><option>1.0</option></select>
+  <button id="run" class="primary">Run</button>
+  <button id="confirm">Confirm step</button>
+  <button id="halt" class="danger">Halt</button>
+  <button id="reset">Reset</button>
+</header>
+<div id="msg"></div>
+<main>
+  <section><h2>Skills</h2><div id="skills"></div></section>
+  <section><h2>Procedure</h2><ol class="steps" id="steps"></ol><p class="muted" id="empty">Click a skill to add it.</p></section>
+  <section><h2>Step settings</h2><div id="form"><p class="muted">Select a step.</p></div></section>
+</main>
+<section id="log"><h2>Run log</h2><div id="runstate" class="muted">Nothing running.</div><table id="events"></table></section>
+<script>
+const $ = (id) => document.getElementById(id);
+let SKILLS = {}, STATIONS = [], steps = [], sel = -1, polling = null;
+
+async function api(method, path, body) {
+  const r = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  return { ok: r.ok, data };
+}
+function say(text, ok) { const m = $("msg"); m.textContent = text; m.className = ok ? "ok" : "err"; }
+
+function defaults(skill) {
+  const p = {};
+  for (const prm of SKILLS[skill].params) if (!prm.required) p[prm.name] = prm.default;
+  return p;
+}
+function toYamlSteps() {
+  return steps.map((s) => {
+    const params = {};
+    for (const prm of SKILLS[s.skill].params) {
+      const v = s.params[prm.name];
+      if (v === undefined || v === "" || v === null) continue;
+      if (!prm.required && v === prm.default) continue;
+      params[prm.name] = v;
+    }
+    if (s.label) params.label = s.label;
+    if (s.spec) params.spec = s.spec;
+    return { [s.skill]: params };
+  });
+}
+function fromYamlSteps(list) {
+  return (list || []).map((entry) => {
+    const [skill, given] = Object.entries(entry)[0];
+    const params = Object.assign(defaults(skill), given || {});
+    const step = { skill, params, label: params.label || "", spec: params.spec || "" };
+    delete params.label; delete params.spec;
+    return step;
+  });
+}
+function summary(s) {
+  return Object.entries(s.params).filter(([k, v]) => v !== "" && v !== null && v !== undefined)
+    .filter(([k, v]) => { const prm = SKILLS[s.skill].params.find((p) => p.name === k); return prm && (prm.required || v !== prm.default); })
+    .map(([k, v]) => `${k}: ${v}`).join(", ");
+}
+
+function renderSteps() {
+  const ol = $("steps"); ol.innerHTML = "";
+  $("empty").style.display = steps.length ? "none" : "block";
+  steps.forEach((s, i) => {
+    const li = document.createElement("li");
+    if (i === sel) li.className = "sel";
+    li.innerHTML = `<span class="n">${i + 1}</span><span class="what"><b></b><span class="muted"></span></span>
+      <button title="Move up">↑</button><button title="Move down">↓</button><button title="Remove">✕</button>`;
+    li.querySelector("b").textContent = s.label ? `${s.skill} (${s.label})` : s.skill;
+    li.querySelector(".muted").textContent = summary(s);
+    li.onclick = () => { sel = i; renderSteps(); renderForm(); };
+    const [up, down, del] = li.querySelectorAll("button");
+    up.onclick = (e) => { e.stopPropagation(); if (i > 0) { [steps[i - 1], steps[i]] = [steps[i], steps[i - 1]]; sel = i - 1; renderSteps(); renderForm(); } };
+    down.onclick = (e) => { e.stopPropagation(); if (i < steps.length - 1) { [steps[i + 1], steps[i]] = [steps[i], steps[i + 1]]; sel = i + 1; renderSteps(); renderForm(); } };
+    del.onclick = (e) => { e.stopPropagation(); steps.splice(i, 1); sel = Math.min(sel, steps.length - 1); renderSteps(); renderForm(); };
+    ol.appendChild(li);
+  });
+}
+
+function field(labelText, help, input) {
+  const l = document.createElement("label");
+  const span = document.createElement("span"); span.textContent = labelText + (help ? ` · ${help}` : "");
+  l.appendChild(span); l.appendChild(input); return l;
+}
+function renderForm() {
+  const f = $("form"); f.innerHTML = "";
+  if (sel < 0 || !steps[sel]) { f.innerHTML = '<p class="muted">Select a step.</p>'; return; }
+  const s = steps[sel], sk = SKILLS[s.skill];
+  const p = document.createElement("p"); p.className = "muted"; p.textContent = sk.help; f.appendChild(p);
+  for (const prm of sk.params) {
+    let input;
+    if (prm.station) {
+      input = document.createElement("select");
+      input.innerHTML = '<option value="">choose…</option>';
+      for (const st of STATIONS) {
+        const o = document.createElement("option"); o.value = st.name;
+        o.textContent = st.description ? `${st.name} (${st.description})` : st.name; input.appendChild(o);
+      }
+      input.value = s.params[prm.name] ?? "";
+    } else if (prm.type === "bool") {
+      input = document.createElement("input"); input.type = "checkbox"; input.checked = !!s.params[prm.name];
+    } else {
+      input = document.createElement("input");
+      if (prm.type === "float" || prm.type === "int") { input.type = "number"; input.step = prm.type === "int" ? "1" : "any"; }
+      input.value = s.params[prm.name] ?? "";
+    }
+    input.onchange = () => {
+      let v = prm.type === "bool" ? input.checked : input.value;
+      if ((prm.type === "float" || prm.type === "int") && v !== "") v = Number(v);
+      s.params[prm.name] = v; renderSteps();
+    };
+    f.appendChild(field(prm.name + (prm.required ? " *" : ""), prm.help, input));
+  }
+  for (const key of ["label", "spec"]) {
+    const input = document.createElement("input"); input.value = s[key] || "";
+    input.onchange = () => { s[key] = input.value.trim(); renderSteps(); };
+    f.appendChild(field(key, key === "spec" ? "D4607 clause, e.g. 10.4" : "name in the run log", input));
+  }
+}
+
+async function refreshList() {
+  const { data } = await api("GET", "/api/procedures");
+  const sel = $("load"); sel.innerHTML = '<option value="">Open…</option>';
+  for (const n of data) { const o = document.createElement("option"); o.value = o.textContent = n; sel.appendChild(o); }
+}
+function procedure() { return { name: $("name").value.trim(), steps: toYamlSteps() }; }
+
+$("load").onchange = async () => {
+  const n = $("load").value; if (!n) return;
+  const { ok, data } = await api("GET", `/api/procedures/${n}`);
+  if (!ok) return say(data.error, false);
+  $("name").value = n; steps = fromYamlSteps(data.steps); sel = -1; renderSteps(); renderForm(); say(`Opened ${n}.`, true);
+};
+$("new").onclick = () => { steps = []; sel = -1; $("name").value = ""; renderSteps(); renderForm(); $("msg").className = ""; };
+$("check").onclick = async () => {
+  const { ok, data } = await api("POST", "/api/compile", procedure());
+  ok ? say(`Looks good: ${data.steps.length} arm steps.`, true) : say(data.error, false);
+};
+$("save").onclick = async () => {
+  const name = $("name").value.trim(); if (!name) return say("Give the procedure a name first.", false);
+  const { ok, data } = await api("PUT", `/api/procedures/${name}`, procedure());
+  if (!ok) return say(data.error, false);
+  say(`Saved to ${data.saved}.`, true); refreshList();
+};
+$("run").onclick = async () => {
+  const name = $("name").value.trim(); if (!name) return say("Save the procedure before running it.", false);
+  const { ok, data } = await api("POST", "/api/run", { name, speed_scale: Number($("speed").value) });
+  if (!ok) return say(data.error, false);
+  say(`Running ${name}. Keep a hand near the emergency stop.`, true); poll();
+};
+for (const action of ["confirm", "halt", "reset"]) {
+  $(action).onclick = async () => {
+    const { ok, data } = await api("POST", `/api/${action}`);
+    say(ok ? `${action}: done` : `${action} failed: ${data.error || data.output || ""}`, ok);
+  };
+}
+
+function poll() {
+  clearInterval(polling);
+  const tick = async () => {
+    const { data } = await api("GET", "/api/run");
+    $("runstate").textContent = data.name ? `${data.name}: ${data.running ? "running" : "finished"}` : "Nothing running.";
+    const t = $("events"); t.innerHTML = "";
+    for (const e of data.events.slice(-40).reverse()) {
+      const tr = document.createElement("tr");
+      if (/failed|aborted|void/.test(e.event)) tr.className = "bad";
+      if (e.event === "operator_prompt") tr.className = "prompt";
+      const rest = Object.entries(e).filter(([k]) => !["t", "wall", "event"].includes(k)).map(([k, v]) => `${k}: ${v}`).join("  ");
+      tr.innerHTML = "<td></td><td></td><td></td>";
+      tr.children[0].textContent = e.t; tr.children[1].textContent = e.event; tr.children[2].textContent = rest;
+      t.appendChild(tr);
+    }
+    if (!data.running) clearInterval(polling);
+  };
+  tick(); polling = setInterval(tick, 1000);
+}
+
+(async () => {
+  const [sk, st] = await Promise.all([api("GET", "/api/skills"), api("GET", "/api/stations")]);
+  STATIONS = st.data;
+  for (const s of sk.data) {
+    SKILLS[s.name] = s;
+    const b = document.createElement("button"); b.className = "skill";
+    b.innerHTML = "<b></b><small></small>"; b.querySelector("b").textContent = s.name; b.querySelector("small").textContent = s.help;
+    b.onclick = () => { steps.push({ skill: s.name, params: defaults(s.name), label: "", spec: "" }); sel = steps.length - 1; renderSteps(); renderForm(); };
+    $("skills").appendChild(b);
+  }
+  renderSteps(); refreshList(); poll();
+})();
+</script>
+</body>
+</html>

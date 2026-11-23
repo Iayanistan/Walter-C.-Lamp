@@ -1,0 +1,11 @@
+# Run the GR00T policy with a language instruction until max_duration or cancel.
+string instruction       # e.g. "pick up the left flask and place it on the hot plate"
+float64 max_duration     # seconds; 0 uses the bridge default
+---
+bool success
+string message
+uint32 chunks_executed
+---
+uint32 chunks_executed
+float64 elapsed
+float64 last_inference_ms

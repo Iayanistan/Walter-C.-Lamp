@@ -1,0 +1,3 @@
+{"t": 8.478, "wall": "2026-10-04T20:42:37", "event": "baseline_ready", "frames": 20}
+{"t": 8.586, "wall": "2026-10-04T20:42:37", "event": "step_started", "step": "SETUP", "arm": "ARM.home(); CAMERA.capture_baseline()"}
+{"t": 153.391, "wall": "2026-10-04T20:45:02", "event": "run_end", "state": "SETUP", "reason": "window closed"}

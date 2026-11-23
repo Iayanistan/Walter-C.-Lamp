@@ -1,0 +1,57 @@
+# Where things live in the Walter cell, for the FAIRINO FR3 (robot:=fr3). Skills only ever refer to
+# stations by name, so procedures written for the IRB 120 run unchanged; only these poses differ.
+# Use it with: export WALTER_STATIONS=$(ros2 pkg prefix walter_skills)/share/walter_skills/config/stations_fr3.yaml
+# (or teach your own copy). The FR3 reaches along -x of its base_link, so these poses do too.
+#
+# poses:   joint positions [joint_1 .. joint_6] in radians. PLACEHOLDERS: teach real ones with
+#          `ros2 run walter_skills teach --station <name> --pose <pose>` (Stage 3 of the tutorial).
+# tag:     the AprilTag stuck to the equipment at this station (Stage 2). expected is its pose
+#          relative to the reference tag on the bench: [x_m, y_m, yaw_deg]. Teach it with
+#          `ros2 run walter_skills teach --station <name> --tag`.
+# A station without a tag is fixed to the bench and is never checked.
+
+reference_tag: 0          # tag36h11 id 0, screwed to the bench where the scene camera always sees it
+tag_family: tag36h11
+default_tolerance: {mm: 3.0, deg: 3.0}
+
+gripper:
+  open: 0.04
+  closed: 0.0
+
+stations:
+  rack_1:
+    description: Flask rack, slot 1
+    tag: {id: 1, expected: [0.30, 0.20, 0.0]}
+    poses:
+      above: [0.3389, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [0.3501, -1.31, 1.6614, -1.9222, -1.5708, 0.0]
+  hotplate:
+    description: Hot plate
+    tag: {id: 2, expected: [0.30, 0.00, 0.0]}
+    poses:
+      above: [-0.2611, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [-0.2499, -1.31, 1.6614, -1.9222, -1.5708, 0.0]
+  cool_pad:
+    description: Cooling pad
+    tag: {id: 3, expected: [0.30, -0.20, 0.0]}
+    poses:
+      above: [-0.8611, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [-0.8499, -1.31, 1.6614, -1.9222, -1.5708, 0.0]
+  dispenser:
+    description: Bottle-top iodine dispenser (fixed to the bench)
+    poses:
+      under: [-0.5905, -1.5733, 1.5971, -1.5946, -1.5708, 0.0]
+  shake:
+    description: Free space for shaking a stoppered flask
+    poses:
+      start: [-0.6075, -1.6018, 1.2823, -1.2513, -1.5708, 0.0]
+  funnel:
+    description: Filter funnel over the receiving flask
+    tag: {id: 4, expected: [0.45, 0.30, 0.0]}
+    poses:
+      above: [0.6348, -1.4411, 1.2909, -1.4206, -1.5708, 0.0]
+      pour: [0.6348, -1.4411, 1.2909, -1.4206, -0.5708, 0.0]    # J5 tilts the flask about 55 deg
+  home:
+    description: Safe pose clear of everything
+    poses:
+      home: [-0.3469, -1.7251, 1.3482, -1.1939, -1.5708, 0.0]

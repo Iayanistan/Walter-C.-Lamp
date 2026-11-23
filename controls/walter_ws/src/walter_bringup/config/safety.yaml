@@ -1,0 +1,21 @@
+# Safety filter between the GR00T bridge and joint_trajectory_controller.
+# This is a software guard for development only. The real cell still needs the IRC5's own
+# limits (and SafeMove if purchased), a wired e-stop, and a guarded workspace.
+safety_filter:
+  ros__parameters:
+    joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+    # Datasheet limits (rad) shrunk by joint_margin on each side.
+    lower_limits: [-2.87979, -1.91986, -1.91986, -2.79253, -2.094395, -6.98132]
+    upper_limits: [2.87979, 1.91986, 1.22173, 2.79253, 2.094395, 6.98132]
+    joint_margin: 0.05
+    # IRB 120 rated axis speeds (rad/s) times velocity_scale. 0.25 keeps the TCP well under the
+    # 0.5 m/s cap set for the project while a policy is being trusted.
+    max_velocities: [4.36332, 4.36332, 4.36332, 5.58505, 5.58505, 7.33038]
+    velocity_scale: 0.25
+    # Reject a chunk whose first point is further than this from the measured position (rad).
+    max_start_jump: 0.15
+    # TCP must stay in this box, expressed in the arm's base_link frame (m).
+    workspace_min: [0.10, -0.45, 0.02]
+    workspace_max: [0.60, 0.45, 0.55]
+    # Hold position if no chunk arrives for this long while in VLA mode (s).
+    chunk_timeout: 1.0

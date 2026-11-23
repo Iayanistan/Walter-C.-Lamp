@@ -1,0 +1,4 @@
+{"t": 4.695, "wall": "2026-09-28T00:51:17", "event": "baseline_ready", "frames": 20}
+{"t": 4.77, "wall": "2026-09-28T00:51:17", "event": "step_started", "step": "SETUP", "arm": "ARM.home(); CAMERA.capture_baseline()"}
+{"t": 7.59, "wall": "2026-09-28T00:51:20", "event": "spill_halt", "step": "SETUP", "material": "solid", "area": 2500, "arm": "ARM.emergency_stop()"}
+{"t": 31.836, "wall": "2026-09-28T00:51:44", "event": "run_end", "state": "SPILL_HALT"}

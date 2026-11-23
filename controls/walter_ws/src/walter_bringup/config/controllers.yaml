@@ -1,0 +1,43 @@
+# ros2_control controllers. Same file for mock, Isaac Sim and the real IRB 120.
+controller_manager:
+  ros__parameters:
+    update_rate: 250  # Hz. Matches the EGM cycle (4 ms) on the IRC5.
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    # MoveIt (scripted steps) and the GR00T bridge (learned steps) both end up here.
+    # MoveIt sends FollowJointTrajectory goals; the safety filter streams action chunks
+    # to ~/joint_trajectory, which replaces the active trajectory from "now".
+    joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    gripper_position_controller:
+      type: forward_command_controller/ForwardCommandController
+
+joint_trajectory_controller:
+  ros__parameters:
+    joints: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+    # position + velocity, as abb_ros2 expects; mock and Isaac accept both too.
+    command_interfaces: [position, velocity]
+    state_interfaces: [position, velocity]
+    state_publish_rate: 100.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    # Chunks from the VLA end mid-motion and are replaced by the next chunk.
+    allow_nonzero_velocity_at_trajectory_end: true
+    interpolation_method: splines
+    constraints:
+      stopped_velocity_tolerance: 0.01
+      goal_time: 0.5
+      joint_1: {trajectory: 0.2, goal: 0.01}
+      joint_2: {trajectory: 0.2, goal: 0.01}
+      joint_3: {trajectory: 0.2, goal: 0.01}
+      joint_4: {trajectory: 0.2, goal: 0.01}
+      joint_5: {trajectory: 0.2, goal: 0.01}
+      joint_6: {trajectory: 0.2, goal: 0.01}
+
+gripper_position_controller:
+  ros__parameters:
+    joints: [gripper_joint]
+    interface_name: position

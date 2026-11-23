@@ -1,0 +1,161 @@
+<?xml version="1.0"?>
+<!-- Walter C. Lamp work cell: bench, arm, placeholder parallel gripper, cameras.
+     robot:=irb120 (ABB IRB 120, the RobotStudio practice arm) or robot:=fr3 (FAIRINO FR3, the final arm).
+     Both macros use the same frame names (base_link, joint_1..joint_6, tool0), so everything above
+     the description only needs the robot's limits (bringup config) and FK chain (kinematics.py). -->
+<robot name="walter" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:arg name="robot" default="irb120"/>
+  <xacro:arg name="hardware" default="mock"/>
+  <xacro:arg name="controller_ip" default="192.168.58.2"/>
+  <xacro:arg name="rws_ip" default="None"/>
+  <xacro:arg name="rws_port" default="80"/>
+  <xacro:arg name="configure_via_rws" default="true"/>
+  <xacro:arg name="egm_port" default="6511"/>
+
+  <!-- Bench geometry (metres). Update to the real bench before running MoveIt on hardware. -->
+  <xacro:property name="bench_x" value="1.2"/>
+  <xacro:property name="bench_y" value="0.8"/>
+  <xacro:property name="bench_z" value="0.9"/>
+  <xacro:property name="base_offset_x" value="-0.35"/>
+
+  <xacro:property name="robot" value="$(arg robot)"/>
+  <xacro:include filename="$(find walter_description)/urdf/irb120_3_58_macro.xacro"/>
+  <xacro:include filename="$(find walter_description)/urdf/fairino_fr3_macro.xacro"/>
+  <xacro:include filename="$(find walter_description)/urdf/walter.ros2_control.xacro"/>
+
+  <link name="world"/>
+
+  <link name="bench">
+    <visual>
+      <origin xyz="0 0 ${-bench_z/2}"/>
+      <geometry><box size="${bench_x} ${bench_y} ${bench_z}"/></geometry>
+      <material name="bench_grey"><color rgba="0.55 0.55 0.58 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${-bench_z/2}"/>
+      <geometry><box size="${bench_x} ${bench_y} ${bench_z}"/></geometry>
+    </collision>
+  </link>
+  <!-- `bench` frame sits on the bench top surface, centred. Task poses are expressed in it. -->
+  <joint name="world-bench" type="fixed">
+    <parent link="world"/>
+    <child link="bench"/>
+    <origin xyz="0 0 ${bench_z}"/>
+  </joint>
+
+  <xacro:if value="${robot == 'irb120'}"><xacro:abb_irb120_3_58 prefix=""/></xacro:if>
+  <xacro:if value="${robot == 'fr3'}"><xacro:fairino_fr3 prefix=""/></xacro:if>
+  <!-- The FR3 works along -x of its own base_link (zero pose points that way, like UR arms), so it is
+       mounted turned 180 degrees: both arms then face +x of the bench and the station layout carries over. -->
+  <joint name="bench-base_link" type="fixed">
+    <parent link="bench"/>
+    <child link="base_link"/>
+    <origin xyz="${base_offset_x} 0 0" rpy="0 0 ${pi if robot == 'fr3' else 0}"/>
+  </joint>
+
+  <!-- Placeholder parallel gripper (about 0.5 kg budget). Replace with the purchased gripper's model. -->
+  <link name="gripper_body">
+    <inertial>
+      <mass value="0.4"/>
+      <origin xyz="0 0 0.03"/>
+      <inertia ixx="0.0004" ixy="0" ixz="0" iyy="0.0004" iyz="0" izz="0.0003"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.03"/>
+      <geometry><box size="0.05 0.09 0.06"/></geometry>
+      <material name="gripper_dark"><color rgba="0.15 0.15 0.15 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.03"/>
+      <geometry><box size="0.05 0.09 0.06"/></geometry>
+    </collision>
+  </link>
+  <joint name="tool0-gripper_body" type="fixed">
+    <parent link="tool0"/>
+    <child link="gripper_body"/>
+  </joint>
+
+  <xacro:macro name="finger" params="side sign">
+    <link name="finger_${side}">
+      <inertial>
+        <mass value="0.03"/>
+        <origin xyz="0 0 0.025"/>
+        <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 ${sign*0.005} 0.025"/>
+        <geometry><box size="0.02 0.01 0.05"/></geometry>
+        <material name="gripper_dark"/>
+      </visual>
+      <collision>
+        <origin xyz="0 ${sign*0.005} 0.025"/>
+        <geometry><box size="0.02 0.01 0.05"/></geometry>
+      </collision>
+    </link>
+  </xacro:macro>
+  <xacro:finger side="left" sign="1"/>
+  <xacro:finger side="right" sign="-1"/>
+
+  <!-- gripper_joint = opening of each finger from centre, 0 (closed) to 0.04 m (open). -->
+  <joint name="gripper_joint" type="prismatic">
+    <parent link="gripper_body"/>
+    <child link="finger_left"/>
+    <origin xyz="0 0 0.06"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0.0" upper="0.04" effort="40" velocity="0.1"/>
+  </joint>
+  <joint name="gripper_joint_mimic" type="prismatic">
+    <parent link="gripper_body"/>
+    <child link="finger_right"/>
+    <origin xyz="0 0 0.06"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0.0" upper="0.04" effort="40" velocity="0.1"/>
+    <mimic joint="gripper_joint"/>
+  </joint>
+
+  <!-- Tool centre point between the fingertips. MoveIt and the safety filter use this frame. -->
+  <link name="tcp"/>
+  <joint name="gripper_body-tcp" type="fixed">
+    <parent link="gripper_body"/>
+    <child link="tcp"/>
+    <origin xyz="0 0 0.105"/>
+  </joint>
+
+  <!-- Cameras. Optical frames follow REP 103 (z forward, x right, y down). -->
+  <link name="wrist_camera_link"/>
+  <joint name="gripper_body-wrist_camera" type="fixed">
+    <parent link="gripper_body"/>
+    <child link="wrist_camera_link"/>
+    <origin xyz="0.045 0 0.03" rpy="0 ${-pi/2} 0"/>
+  </joint>
+  <link name="wrist_camera_optical_frame"/>
+  <joint name="wrist_camera-optical" type="fixed">
+    <parent link="wrist_camera_link"/>
+    <child link="wrist_camera_optical_frame"/>
+    <origin rpy="${-pi/2} 0 ${-pi/2}"/>
+  </joint>
+
+  <!-- Scene camera: the same overhead/front view the spill-detection PoC uses. Measure and update. -->
+  <link name="scene_camera_link"/>
+  <joint name="bench-scene_camera" type="fixed">
+    <parent link="bench"/>
+    <child link="scene_camera_link"/>
+    <origin xyz="0.55 0 0.6" rpy="0 0.6 ${pi}"/>
+  </joint>
+  <link name="scene_camera_optical_frame"/>
+  <joint name="scene_camera-optical" type="fixed">
+    <parent link="scene_camera_link"/>
+    <child link="scene_camera_optical_frame"/>
+    <origin rpy="${-pi/2} 0 ${-pi/2}"/>
+  </joint>
+
+  <xacro:walter_arm_ros2_control
+    robot="${robot}"
+    hardware="$(arg hardware)"
+    controller_ip="$(arg controller_ip)"
+    rws_ip="$(arg rws_ip)"
+    rws_port="$(arg rws_port)"
+    configure_via_rws="$(arg configure_via_rws)"
+    egm_port="$(arg egm_port)"/>
+  <xacro:walter_gripper_ros2_control hardware="$(arg hardware)"/>
+</robot>

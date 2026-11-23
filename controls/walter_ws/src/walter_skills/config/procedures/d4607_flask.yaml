@@ -1,0 +1,25 @@
+# ASTM D4607 10.4 to 10.5 for one flask, written with skills instead of raw poses.
+# Run: ros2 run walter_skills run $(ros2 pkg prefix walter_skills)/share/walter_skills/config/procedures/d4607_flask.yaml
+name: d4607_flask_1
+steps:
+  - operator: {prompt: "Flask 1 (carbon + 10.0 mL 5% HCl, stopper loosened) in rack slot 1; hot plate on; funnel ready", spec: "10.3-10.4"}
+  # Check the whole cell before anything hot starts. The arm is empty here, so GR00T can fix light items.
+  - verify: {station: funnel, recover: "slide the funnel stand back onto its marks"}
+  - verify: {station: cool_pad}
+  - pick:  {station: rack_1, spec: "10.4"}
+  - place: {station: hotplate, spec: "10.4"}       # a moved hot plate goes to the operator: too hot and heavy to push
+  - home: {}
+  - operator: {prompt: "Confirm the flask contents are boiling", label: boil_started}
+  - wait: {seconds: 30, tolerance_s: 2, label: boil, spec: "10.4"}
+  - pick:  {station: hotplate, spec: "10.4"}
+  - place: {station: cool_pad, spec: "10.4"}
+  - home: {}
+  - operator: {prompt: "Confirm flask 1 is at room temperature", label: cooled}
+  - pick:  {station: cool_pad, spec: "10.5"}
+  - hold_under: {station: dispenser, spec: "10.5"}
+  - operator: {prompt: "Dispense 100.0 mL iodine and seat the stopper", label: iodine_added}
+  - shake: {seconds: 30, tolerance_s: 1, spec: "10.5"}
+  - move_to: {station: funnel, pose: above, seconds: 1.5}
+  - operator: {prompt: "Remove the stopper from flask 1", label: unstopper}
+  - pour: {station: funnel, hold_s: 8, spec: "10.5"}   # holding the flask now, so a moved stand goes to the operator
+  - home: {}

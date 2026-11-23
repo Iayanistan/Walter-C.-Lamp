@@ -1,0 +1,22 @@
+# GR00T policy bridge. The policy server runs in the Isaac-GR00T environment (see controls/vla/).
+vla_bridge:
+  ros__parameters:
+    host: 127.0.0.1
+    port: 5555
+    timeout_ms: 2000
+    # Must match the modality config the checkpoint was fine-tuned with (vla/walter_modality_config.py).
+    video_keys: [scene, wrist]
+    image_topics: [/scene_camera/image_raw, /wrist_camera/image_raw]
+    image_width: 320
+    image_height: 240
+    state_keys: [single_arm, gripper]
+    action_keys: [single_arm, gripper]
+    language_key: annotation.human.task_description
+    arm_joints: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+    gripper_joint: gripper_joint
+    # Dataset / control rate the policy was trained at. Each action step is 1/control_hz apart.
+    control_hz: 15.0
+    # Execute this many steps of each predicted chunk, then re-query (receding horizon).
+    execution_horizon: 8
+    # true if the checkpoint returns deltas from the current state instead of absolute targets.
+    actions_are_deltas: false

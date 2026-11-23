@@ -1,0 +1,54 @@
+# Where things live in the Walter cell. Skills only ever refer to stations by name.
+#
+# poses:   joint positions [joint_1 .. joint_6] in radians. PLACEHOLDERS: teach real ones with
+#          `ros2 run walter_skills teach --station <name> --pose <pose>` (Stage 3 of the tutorial).
+# tag:     the AprilTag stuck to the equipment at this station (Stage 2). expected is its pose
+#          relative to the reference tag on the bench: [x_m, y_m, yaw_deg]. Teach it with
+#          `ros2 run walter_skills teach --station <name> --tag`.
+# A station without a tag is fixed to the bench and is never checked.
+
+reference_tag: 0          # tag36h11 id 0, screwed to the bench where the scene camera always sees it
+tag_family: tag36h11
+default_tolerance: {mm: 3.0, deg: 3.0}
+
+gripper:
+  open: 0.04
+  closed: 0.0
+
+stations:
+  rack_1:
+    description: Flask rack, slot 1
+    tag: {id: 1, expected: [0.30, 0.20, 0.0]}
+    poses:
+      above: [0.6, 0.35, 0.10, 0.0, 1.12, 0.0]
+      grasp: [0.6, 0.50, 0.15, 0.0, 0.92, 0.0]
+  hotplate:
+    description: Hot plate
+    tag: {id: 2, expected: [0.30, 0.00, 0.0]}
+    poses:
+      above: [0.0, 0.35, 0.10, 0.0, 1.12, 0.0]
+      grasp: [0.0, 0.50, 0.15, 0.0, 0.92, 0.0]
+  cool_pad:
+    description: Cooling pad
+    tag: {id: 3, expected: [0.30, -0.20, 0.0]}
+    poses:
+      above: [-0.6, 0.35, 0.10, 0.0, 1.12, 0.0]
+      grasp: [-0.6, 0.50, 0.15, 0.0, 0.92, 0.0]
+  dispenser:
+    description: Bottle-top iodine dispenser (fixed to the bench)
+    poses:
+      under: [-0.3, 0.20, 0.25, 0.0, 1.12, 0.0]
+  shake:
+    description: Free space for shaking a stoppered flask
+    poses:
+      start: [-0.3, 0.10, 0.10, 0.0, 1.37, 0.0]
+  funnel:
+    description: Filter funnel over the receiving flask
+    tag: {id: 4, expected: [0.45, 0.30, 0.0]}
+    poses:
+      above: [0.9, 0.30, 0.0, 0.0, 1.27, 0.0]
+      pour: [0.9, 0.30, 0.0, 0.0, 0.37, 0.0]    # J5 tilts the flask about 55 deg
+  home:
+    description: Safe pose clear of everything
+    poses:
+      home: [0.0, 0.0, 0.0, 0.0, 1.5708, 0.0]

@@ -1,0 +1,42 @@
+# MoveIt Servo for gamepad teleoperation (demonstrations for GR00T, and jogging while teaching).
+# Deliberately slow: 0.10 m/s and 0.5 rad/s at full stick.
+publish_period: 0.01
+max_expected_latency: 0.1
+incoming_command_timeout: 0.2
+
+command_in_type: "unitless"          # the gamepad sends -1..1
+scale:
+  linear: 0.10
+  rotational: 0.5
+  joint: 0.5
+
+command_out_type: trajectory_msgs/JointTrajectory
+publish_joint_positions: true
+publish_joint_velocities: true
+publish_joint_accelerations: false
+
+use_smoothing: true
+smoothing_filter_plugin_name: "online_signal_smoothing::AccelerationLimitedPlugin"
+
+is_primary_planning_scene_monitor: false   # move_group owns the planning scene
+check_octomap_collisions: false
+
+move_group_name: arm
+planning_frame: base_link
+ee_frame: tcp
+
+lower_singularity_threshold: 10.0
+hard_stop_singularity_threshold: 30.0
+leaving_singularity_threshold_multiplier: 2.0
+joint_limit_margins: [0.12]
+
+cartesian_command_in_topic: ~/delta_twist_cmds
+joint_command_in_topic: ~/delta_joint_cmds
+joint_topic: /joint_states
+status_topic: ~/status
+command_out_topic: /joint_trajectory_controller/joint_trajectory
+
+check_collisions: true
+collision_check_rate: 10.0
+self_collision_proximity_threshold: 0.01
+scene_collision_proximity_threshold: 0.02

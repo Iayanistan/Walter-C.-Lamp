@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+build/
+install/
+log/
+# Pretrained Ultralytics weights download automatically
+yolo11*.pt
+yolo26*.pt

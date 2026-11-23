@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!-- FAIRINO FR3 version of walter.srdf (robot:=fr3). Link and joint names match the IRB 120
+     model, so only the named poses differ.
+     Re-run the MoveIt Setup Assistant's collision matrix step once the real gripper and bench
+     models are in; the disable list below is hand-written from link adjacency. -->
+<robot name="walter">
+  <group name="arm">
+    <chain base_link="base_link" tip_link="tcp"/>
+  </group>
+  <group name="gripper">
+    <joint name="gripper_joint"/>
+  </group>
+
+  <!-- tool pointing down, arm folded over the bench -->
+  <group_state name="home" group="arm">
+    <joint name="joint_1" value="-0.3469"/>
+    <joint name="joint_2" value="-1.7251"/>
+    <joint name="joint_3" value="1.3482"/>
+    <joint name="joint_4" value="-1.1939"/>
+    <joint name="joint_5" value="-1.5708"/>
+    <joint name="joint_6" value="0"/>
+  </group_state>
+  <!-- above the hot plate -->
+  <group_state name="ready" group="arm">
+    <joint name="joint_1" value="-0.2611"/>
+    <joint name="joint_2" value="-1.4271"/>
+    <joint name="joint_3" value="1.4847"/>
+    <joint name="joint_4" value="-1.6284"/>
+    <joint name="joint_5" value="-1.5708"/>
+    <joint name="joint_6" value="0"/>
+  </group_state>
+  <group_state name="open" group="gripper">
+    <joint name="gripper_joint" value="0.04"/>
+  </group_state>
+  <group_state name="closed" group="gripper">
+    <joint name="gripper_joint" value="0.0"/>
+  </group_state>
+
+  <end_effector name="gripper" parent_link="tcp" group="gripper" parent_group="arm"/>
+  <passive_joint name="gripper_joint_mimic"/>
+
+  <disable_collisions link1="bench" link2="base_link" reason="Adjacent"/>
+  <disable_collisions link1="bench" link2="link_1" reason="Never"/>
+  <disable_collisions link1="base_link" link2="link_1" reason="Adjacent"/>
+  <disable_collisions link1="base_link" link2="link_2" reason="Never"/>
+  <disable_collisions link1="link_1" link2="link_2" reason="Adjacent"/>
+  <disable_collisions link1="link_1" link2="link_3" reason="Never"/>
+  <disable_collisions link1="link_2" link2="link_3" reason="Adjacent"/>
+  <disable_collisions link1="link_2" link2="link_4" reason="Never"/>
+  <disable_collisions link1="link_3" link2="link_4" reason="Adjacent"/>
+  <disable_collisions link1="link_3" link2="link_5" reason="Never"/>
+  <disable_collisions link1="link_3" link2="link_6" reason="Never"/>
+  <disable_collisions link1="link_4" link2="link_5" reason="Adjacent"/>
+  <disable_collisions link1="link_4" link2="link_6" reason="Never"/>
+  <disable_collisions link1="link_5" link2="link_6" reason="Adjacent"/>
+  <disable_collisions link1="link_5" link2="gripper_body" reason="Never"/>
+  <disable_collisions link1="link_6" link2="gripper_body" reason="Adjacent"/>
+  <disable_collisions link1="link_6" link2="finger_left" reason="Never"/>
+  <disable_collisions link1="link_6" link2="finger_right" reason="Never"/>
+  <disable_collisions link1="gripper_body" link2="finger_left" reason="Adjacent"/>
+  <disable_collisions link1="gripper_body" link2="finger_right" reason="Adjacent"/>
+  <disable_collisions link1="finger_left" link2="finger_right" reason="Never"/>
+</robot>

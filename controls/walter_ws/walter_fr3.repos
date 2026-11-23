@@ -1,0 +1,12 @@
+# Source dependencies for the FAIRINO FR3 (robot:=fr3). fairino_description (meshes) is needed for
+# any robot:=fr3 run; fairino_hardware only for hardware:=fairino.
+#   cd ~/walter_ws/src && vcs import < ../walter_fr3.repos
+# Then keep ONE fairino_hardware* package, the one matching the WebApp version (System > About),
+# and drop a COLCON_IGNORE file into every other fairino_hardware_* folder and the *_moveit2_config
+# folders (they all declare the same plugin, and our walter_moveit_config replaces theirs).
+# Pin version to the commit you tested; fcf0c7f was the head on 2026-10-26.
+repositories:
+  frcobot_ros2:
+    type: git
+    url: https://github.com/FAIR-INNOVATION/frcobot_ros2.git
+    version: main

@@ -1,0 +1,9 @@
+# Ask the supervisor to change mode. HALTED can only be left through ~/reset.
+string IDLE=IDLE
+string SCRIPTED=SCRIPTED
+string VLA=VLA
+string mode
+---
+bool success
+string message
+string mode   # mode after the call

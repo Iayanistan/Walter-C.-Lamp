@@ -1,0 +1,133 @@
+# Spill-detection proof of concept — single source of configuration.
+# Everything the demo does is driven from here so peers can see the logic is data, not magic.
+
+camera:
+  source: 0            # webcam index, or a path to a video file
+  width: 1280
+  height: 720
+  flip_horizontal: false
+
+detector:
+  weights: models/vessels.pt      # produced by scripts/train_vessels.py
+  fallback_weights: yolo11n.pt    # COCO model used until vessels.pt exists (auto-downloaded)
+  device: 0                       # CUDA device index, or "cpu"
+  imgsz: 640
+  conf: 0.35
+  iou: 0.5
+  memory_frames: 15               # keep a vessel's last box this many frames after YOLO loses it
+  # Our 5 classes. Order = class index in data/dataset/data.yaml.
+  classes: [scale, beaker, petri_dish, test_tube, pipette]
+  # COCO -> our classes, only used with fallback_weights so the pipeline runs before training.
+  coco_fallback_map:
+    cup: beaker
+    bowl: petri_dish
+    bottle: test_tube
+    wine glass: beaker
+    toothbrush: pipette
+
+# Training data: public Roboflow Universe datasets forked into your workspace.
+# scripts/prepare_dataset.py downloads each version (YOLOv11 export), remaps its class
+# names onto our 5 classes with `class_map`, drops every other label, and merges them
+# into data/dataset/. Class names not listed in a map are dropped for that source.
+dataset:
+  workspace: iayan-ansari-s-workspace
+  out_dir: C:/Users/ansariia/spillpoc_data/dataset      # outside OneDrive: sync makes training I/O crawl
+  download_dir: C:/Users/ansariia/spillpoc_data/downloads
+  sources:
+    - project: lab-assistant-ver.2-5ulda        # MIT — projektas-1tsnj/lab-assistant-ver.2
+      version: 1
+      class_map:
+        Mechanical_Balance_Scale: scale
+        Precision_Weight_Scale: scale
+        Beaker: beaker
+        "Petri dish": petri_dish
+        Test_Tube: test_tube
+        Pipette: pipette
+        Volumetric_Pipet: pipette
+    - project: laboratory-material-detector-thzvb   # CC BY 4.0 — object-detection-mylvp/laboratory-material-detector
+      version: 1
+      class_map:
+        Beaker: beaker
+        "Petri Dish": petri_dish
+        "Test Tube": test_tube
+        Dropper: pipette
+    - project: chemistrylab-mcmdo                # CC BY 4.0 — aihcmc/chemistrylab
+      version: 1
+      class_map:
+        beaker: beaker
+        "petri dish": petri_dish
+        "test tube": test_tube
+        pipette: pipette
+        dropper: pipette
+    - project: petri-dish-f96wr-qqaut            # CC BY 4.0 — microbio-xyalg/petri-dish (agar plates)
+      version: 1
+      class_map:
+        Petri: petri_dish
+
+# Materials are found by colour. Run scripts/tune_colors.py to set these on your bench;
+# it rewrites this section. H in [0,179], S and V in [0,255] (OpenCV convention).
+materials:
+  liquid:
+    # Blue dyed water by default. For iodine (brown/orange) expect hue ~5-20 and high S.
+    hsv_ranges:
+      - {lower: [95, 120, 60], upper: [125, 255, 255]}
+    open_kernel: 3
+    close_kernel: 7
+    min_blob_area: 150
+    allowed_in: [beaker, petri_dish, test_tube, pipette]
+  solid:
+    # Green granular material by default.
+    hsv_ranges:
+      - {lower: [40, 90, 60], upper: [85, 255, 255]}
+    open_kernel: 3
+    close_kernel: 5
+    min_blob_area: 60
+    allowed_in: [scale, petri_dish]
+
+spill:
+  vessel_margin_px: 18      # dilate vessel boxes by this much before subtracting
+  min_spill_area: 250       # px^2 of material outside every allowed region
+  persist_frames: 5         # must be seen this many consecutive frames to fire
+  clear_frames: 15          # consecutive clean frames before the spill is considered cleared
+  baseline_frames: 20       # frames averaged to build the "empty bench" mask at start
+
+protocol:
+  name: "Two-material iodine test (solid then liquid)"
+  stable_s: 2.0             # how long a condition must hold to count as "done"
+  required_vessels: [scale, beaker, petri_dish]
+  optional_vessels: [test_tube]
+  # Fraction of a vessel's box area that must be covered by material to count as "present in it".
+  presence_fraction:
+    solid_on_scale: 0.010
+    solid_in_dish: 0.015
+    liquid_in_dish: 0.015
+  steps:
+    - name: SETUP
+      arm_command: "ARM.home(); CAMERA.capture_baseline()"
+      done_when: all_required_vessels_visible
+      timeout_s: 0
+    - name: WEIGH_SOLID
+      arm_command: "ARM.dispense_solid(target='scale')"
+      done_when: solid_on_scale
+      timeout_s: 120
+    - name: TRANSFER_SOLID
+      arm_command: "ARM.transfer(from='scale', to='petri_dish')"
+      done_when: solid_in_dish
+      timeout_s: 120
+    - name: DRAW_LIQUID
+      arm_command: "ARM.pipette.aspirate(from='beaker', volume_ul=200)"
+      done_when: pipette_at_beaker
+      timeout_s: 120
+    - name: DISPENSE_LIQUID
+      arm_command: "ARM.pipette.dispense(to='petri_dish')"
+      done_when: liquid_in_dish
+      timeout_s: 120
+    - name: VERIFY
+      arm_command: "CAMERA.verify_result()"
+      done_when: solid_and_liquid_in_dish
+      timeout_s: 60
+
+output:
+  runs_dir: runs
+  save_spill_snapshots: true
+  window_name: "Spill Detection PoC"

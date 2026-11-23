@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<!-- ros2_control blocks for the Walter cell.
+     One description, four back ends, selected by `hardware`:
+       mock    : mock_components/GenericSystem (no robot, no sim; commands echo back as state)
+       isaac   : topic_based_ros2_control talking to Isaac Sim over /isaac_joint_commands and /isaac_joint_states
+       abb     : abb_hardware_interface (PickNik abb_ros2) streaming over EGM, configured over RWS (robot:=irb120)
+       fairino : fairino_hardware (FAIR-INNOVATION frcobot_ros2), ServoJ every 8 ms over the SDK (robot:=fr3)
+     Everything above ros2_control (controllers, MoveIt, safety filter, GR00T bridge) is identical
+     across the three, which is the point of this file. -->
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- IRB 120 joints take position + velocity commands: abb_hardware_interface requires both
+       (it streams them to EGM). fairino_hardware takes position only, so FR3 joints have no velocity
+       command on any back end, and mock/Isaac runs behave like the real arm. It also reports position
+       only, so FR3 joints have no velocity state either. -->
+  <xacro:macro name="walter_joint" params="name lower upper initial velocity_command:=true velocity_state:=true">
+    <joint name="${name}">
+      <command_interface name="position">
+        <param name="min">${lower}</param>
+        <param name="max">${upper}</param>
+      </command_interface>
+      <xacro:if value="${velocity_command}">
+        <command_interface name="velocity"/>
+      </xacro:if>
+      <state_interface name="position">
+        <param name="initial_value">${initial}</param>
+      </state_interface>
+      <xacro:if value="${velocity_state}">
+        <state_interface name="velocity"/>
+      </xacro:if>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="walter_arm_ros2_control" params="robot hardware controller_ip rws_ip rws_port configure_via_rws egm_port">
+    <ros2_control name="walter_arm" type="system">
+      <hardware>
+        <xacro:if value="${hardware == 'mock'}">
+          <plugin>mock_components/GenericSystem</plugin>
+        </xacro:if>
+        <xacro:if value="${hardware == 'isaac'}">
+          <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+          <param name="joint_commands_topic">/isaac_joint_commands</param>
+          <param name="joint_states_topic">/isaac_joint_states</param>
+          <param name="sum_wrapped_joint_states">true</param>
+        </xacro:if>
+        <xacro:if value="${hardware == 'abb'}">
+          <!-- Parameter names follow abb_ros2's irb1200.ros2_control.xacro (rolling branch).
+               Requires the EGM option (689-1) on the IRC5 and RobotWare 6.x for RWS 1.0.
+               On OmniCore / RobotWare 7, set configure_via_rws:=false (RWS 2.0 is not supported). -->
+          <plugin>abb_hardware_interface/ABBSystemHardware</plugin>
+          <param name="configure_via_rws">${configure_via_rws}</param>
+          <param name="rws_ip">${rws_ip}</param>
+          <param name="rws_port">${rws_port}</param>
+          <param name="egm_port">${egm_port}</param>
+        </xacro:if>
+        <xacro:if value="${hardware == 'fairino'}">
+          <!-- FAIR-INNOVATION's plugin. Build only the fairino_hardware_vX_Y_Z package that matches the
+               controller's software version (WebApp: System, About). Upstream hard-codes the controller
+               IP (192.168.58.2) in fairino_hardware_interface.hpp; this param is for a patched copy
+               that reads it, and is ignored otherwise. -->
+          <plugin>fairino_hardware/FairinoHardwareInterface</plugin>
+          <param name="controller_ip">${controller_ip}</param>
+        </xacro:if>
+      </hardware>
+      <xacro:if value="${robot == 'irb120'}">
+        <!-- IRB 120 datasheet axis ranges (same as the URDF). -->
+        <xacro:walter_joint name="joint_1" lower="-2.87979" upper="2.87979" initial="0.0"/>
+        <xacro:walter_joint name="joint_2" lower="-1.91986" upper="1.91986" initial="0.0"/>
+        <xacro:walter_joint name="joint_3" lower="-1.91986" upper="1.22173" initial="0.0"/>
+        <xacro:walter_joint name="joint_4" lower="-2.79253" upper="2.79253" initial="0.0"/>
+        <xacro:walter_joint name="joint_5" lower="-2.094395" upper="2.094395" initial="1.5708"/>
+        <xacro:walter_joint name="joint_6" lower="-6.98132" upper="6.98132" initial="0.0"/>
+      </xacro:if>
+      <xacro:if value="${robot == 'fr3'}">
+        <!-- FR3 ranges from fairino3_v6.urdf. Initial pose: forearm up, wrist down (a safe, non-singular start). -->
+        <xacro:walter_joint name="joint_1" lower="-3.0543" upper="3.0543" initial="0.0" velocity_command="false" velocity_state="false"/>
+        <xacro:walter_joint name="joint_2" lower="-4.6251" upper="1.4835" initial="-1.5708" velocity_command="false" velocity_state="false"/>
+        <xacro:walter_joint name="joint_3" lower="-2.8274" upper="2.8274" initial="1.5708" velocity_command="false" velocity_state="false"/>
+        <xacro:walter_joint name="joint_4" lower="-4.6251" upper="1.4835" initial="-1.5708" velocity_command="false" velocity_state="false"/>
+        <xacro:walter_joint name="joint_5" lower="-3.0543" upper="3.0543" initial="-1.5708" velocity_command="false" velocity_state="false"/>
+        <xacro:walter_joint name="joint_6" lower="-3.0543" upper="3.0543" initial="0.0" velocity_command="false" velocity_state="false"/>
+      </xacro:if>
+    </ros2_control>
+  </xacro:macro>
+
+  <!-- The IRB 120 ships without a gripper, so the gripper is its own ros2_control system.
+       With hardware:=abb it stays mock until a real gripper is chosen; the usual real options are
+       an ABB digital output driven through abb_rws_client, or the gripper vendor's own ROS 2 driver. -->
+  <xacro:macro name="walter_gripper_ros2_control" params="hardware">
+    <ros2_control name="gripper" type="system">
+      <hardware>
+        <xacro:if value="${hardware == 'isaac'}">
+          <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+          <!-- Own command topic: Isaac's ROS2SubscribeJointState keeps only the latest message per tick,
+               so arm and gripper commands on one topic would overwrite each other. -->
+          <param name="joint_commands_topic">/isaac_gripper_commands</param>
+          <param name="joint_states_topic">/isaac_joint_states</param>
+        </xacro:if>
+        <xacro:unless value="${hardware == 'isaac'}">
+          <plugin>mock_components/GenericSystem</plugin>
+        </xacro:unless>
+      </hardware>
+      <xacro:walter_joint name="gripper_joint" lower="0.0" upper="0.04" initial="0.04" velocity_command="false"/>
+    </ros2_control>
+  </xacro:macro>
+</robot>

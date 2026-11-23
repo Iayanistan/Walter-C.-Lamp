@@ -1,0 +1,21 @@
+# Safety filter settings for the FAIRINO FR3 (robot:=fr3). Same software guard as safety.yaml.
+# The real cell still needs the FR3's own limits set in the WebApp (joint/TCP speed, collision
+# sensitivity, safety planes), a wired e-stop, and a guarded workspace.
+safety_filter:
+  ros__parameters:
+    robot: fr3   # selects the FR3 kinematics for the workspace check
+    joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+    # Limits from fairino3_v6.urdf (rad) shrunk by joint_margin on each side.
+    lower_limits: [-3.0543, -4.6251, -2.8274, -4.6251, -3.0543, -3.0543]
+    upper_limits: [3.0543, 1.4835, 2.8274, 1.4835, 3.0543, 3.0543]
+    joint_margin: 0.05
+    # FR3 rated joint speeds (180 deg/s) times velocity_scale. 0.25 keeps the TCP under the
+    # project's 0.5 m/s cap while a policy is being trusted.
+    max_velocities: [3.15, 3.15, 3.15, 3.2, 3.2, 3.2]
+    velocity_scale: 0.25
+    max_start_jump: 0.15
+    # TCP box in the FR3's base_link frame (m). The FR3 is mounted yawed 180 deg on the bench,
+    # so the work area is at negative x in its own frame.
+    workspace_min: [-0.60, -0.45, 0.02]
+    workspace_max: [-0.10, 0.45, 0.55]
+    chunk_timeout: 1.0

@@ -1,0 +1,1292 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Walter Procedure Builder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap">
+<style>[hidden]{display:none!important}
+/* Layout: block shelf | script canvas where blocks snap into one stack | stage (bench plan + dry run) pinned on top of the block editor. */
+:root {
+  --glass: #edf1f0;      /* page chrome: borosilicate, faintly green */
+  --sheet: #fbfcfc;
+  --canvas: #f6f8f8;     /* script area */
+  --dot: #d5dcda;
+  --ink: #1a2130;
+  --muted: #586373;
+  --rule: #cad3d1;
+  --epoxy: #dfe5e3;
+  --iodine: #8c4210;
+  --iodine-soft: #f3e3d6;
+  --violet: #5b3d91;
+  --violet-soft: #ebe4f6;
+  --ok: #2b7653;
+  --warn: #8a5f00;
+  --warn-soft: #f6ecd2;
+  --fault: #c62f22;
+  /* block families, Scratch-like */
+  --b-hat: #e6a800;
+  --b-move: #4c87e8;
+  --b-timed: #e88a12;
+  --b-check: #2f9fbf;
+  --b-people: #8a5cf0;
+  --b-text: #ffffff;
+  --slot: #ffffff;
+  --slot-ink: #3b4256;
+  --glow: #ffd500;
+  --face: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --glass: #121619; --sheet: #192026; --canvas: #161c21; --dot: #2a333b; --ink: #e3e8ea; --muted: #97a2ab; --rule: #2e3841; --epoxy: #222b32;
+    --iodine: #e59157; --iodine-soft: #3a2619; --violet: #a98ee3; --violet-soft: #2b2340;
+    --ok: #62c497; --warn: #e2b656; --warn-soft: #362b12; --fault: #f07c70;
+    --b-hat: #c89300; --b-move: #3f78d6; --b-timed: #d07a0c; --b-check: #2a8eab; --b-people: #7a4fe0; --slot: #f3f5f7; --slot-ink: #2b3142;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --glass: #121619; --sheet: #192026; --canvas: #161c21; --dot: #2a333b; --ink: #e3e8ea; --muted: #97a2ab; --rule: #2e3841; --epoxy: #222b32;
+  --iodine: #e59157; --iodine-soft: #3a2619; --violet: #a98ee3; --violet-soft: #2b2340;
+  --ok: #62c497; --warn: #e2b656; --warn-soft: #362b12; --fault: #f07c70;
+  --b-hat: #c89300; --b-move: #3f78d6; --b-timed: #d07a0c; --b-check: #2a8eab; --b-people: #7a4fe0; --slot: #f3f5f7; --slot-ink: #2b3142;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--glass); color: var(--ink); font-family: var(--face);
+  font-size: 15px; line-height: 1.45; font-variant-numeric: tabular-nums;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 12px;
+  display: flex; flex-direction: column;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--iodine); outline-offset: 2px; }
+
+/* header */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; padding-block: 12px 10px; flex: none; }
+.ident { display: flex; align-items: baseline; gap: 14px; min-width: 0; flex: 1 1 300px; }
+@media (max-width: 600px) { .ident { flex-direction: column; gap: 0; } #procName { font-size: 21px; } }
+.ident .who { font-size: 13px; color: var(--muted); white-space: nowrap; }
+#procName {
+  font-stretch: 115%; font-weight: 780; font-size: 26px; line-height: 1.1; letter-spacing: -0.01em;
+  border: 0; background: transparent; padding: 2px 0; width: 100%; min-width: 0; border-bottom: 2px solid transparent;
+}
+#procName:hover { border-bottom-color: var(--rule); }
+#procName:focus { outline: none; border-bottom-color: var(--iodine); }
+.procbar > * { flex: none; }
+.procbar #delWrap { display: inline-flex; }
+.procbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+select, input[type=text], input[type=number] { background: var(--sheet); border: 1px solid var(--rule); border-radius: 5px; padding: 6px 8px; min-width: 0; }
+.btn { border: 1px solid var(--rule); background: var(--sheet); border-radius: 5px; padding: 6px 12px; cursor: pointer; font-weight: 560; white-space: nowrap; }
+.btn:hover:not(:disabled) { border-color: var(--ink); }
+.btn.primary { background: var(--iodine); border-color: var(--iodine); color: var(--sheet); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.small { padding: 3px 8px; font-size: 13px; }
+.btn.ghost { background: transparent; border-color: transparent; }
+.btn.ghost:hover:not(:disabled) { border-color: var(--rule); }
+.life { display: flex; align-items: center; flex-wrap: wrap; }
+.life .stage { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); padding-right: 8px; }
+.life .stage + .stage::before { content: ""; width: 14px; height: 1px; background: var(--rule); margin-right: 2px; }
+.life .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--rule); }
+.life .stage.done { color: var(--ink); }
+.life .stage.done .dot { background: var(--ok); border-color: var(--ok); }
+.life .stage.now { color: var(--ink); font-weight: 650; }
+.life .stage.now .dot { border-color: var(--iodine); background: var(--iodine-soft); }
+.practice { font-size: 13px; color: var(--muted); padding-bottom: 10px; flex: none; }
+.practice b { color: var(--ink); }
+
+/* workspace: three panes that each scroll on their own */
+.work {
+  flex: 1; min-height: 0; display: grid; grid-template-columns: 236px minmax(0, 1fr) 410px;
+  border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--sheet);
+}
+.pane { min-height: 0; overflow: auto; }
+@media (max-width: 1100px) { .work { grid-template-columns: 210px minmax(0, 1fr) 360px; } }
+@media (max-width: 900px) {
+  html, body { height: auto; }
+  .work { display: flex; flex-direction: column; overflow: visible; }
+  .pane { overflow: visible; }
+  .right { order: -1; }
+  .canvas { min-height: 420px; }
+}
+
+/* shelf */
+.shelf { --under: var(--sheet); border-right: 1px solid var(--rule); padding: 12px 12px 20px; display: grid; gap: 14px; align-content: start; }
+.shelf h2 { font-size: 13px; font-weight: 650; margin: 0 0 8px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+.shelf h2 i { width: 12px; height: 12px; border-radius: 50%; background: var(--c); display: inline-block; }
+.shelf .group { display: grid; gap: 14px; justify-items: start; }
+.shelf .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.stations { display: grid; gap: 3px; font-size: 13.5px; }
+.stations .st { display: flex; gap: 6px; align-items: baseline; justify-content: space-between; }
+.stations .st span:first-child { font-weight: 600; }
+.stations .meta { color: var(--muted); font-size: 12.5px; display: inline-flex; align-items: baseline; gap: 4px; }
+.addst { display: grid; gap: 6px; margin-top: 6px; padding: 10px; border: 1px dashed var(--rule); border-radius: 6px; }
+.addst label { font-size: 12.5px; color: var(--muted); display: grid; gap: 2px; }
+.addst .row { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+
+/* blocks */
+.blk { display: flex; align-items: flex-start; position: relative; touch-action: none; user-select: none; -webkit-user-select: none; }
+.n { width: 30px; flex: none; text-align: right; padding: 13px 8px 0 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+.shape {
+  --c: var(--b-move);
+  position: relative; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px 6px;
+  min-height: 46px; padding: 11px 12px 9px; max-width: 100%;
+  background: var(--c); color: var(--b-text); font-weight: 700; font-size: 14.5px; border-radius: 5px;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.16); cursor: grab;
+}
+.shape::before, .shape::after { content: ""; position: absolute; left: 14px; width: 34px; height: 8px; }
+.shape::before { top: 0; background: var(--under, var(--canvas)); clip-path: polygon(0 0, 100% 0, 80% 100%, 20% 100%); z-index: 1; }
+.shape::after { bottom: -8px; background: var(--c); clip-path: polygon(0 0, 100% 0, 80% 100%, 20% 100%); z-index: 2; }
+.f-move { --c: var(--b-move); } .f-timed { --c: var(--b-timed); } .f-check { --c: var(--b-check); } .f-people { --c: var(--b-people); }
+.hat .shape { --c: var(--b-hat); border-radius: 26px 8px 5px 5px / 18px 8px 5px 5px; padding-top: 16px; cursor: pointer; }
+.hat .shape::before { display: none; }
+.in {
+  background: var(--slot); color: var(--slot-ink); border-radius: 999px; padding: 1px 9px; font-weight: 650; font-size: 13.5px;
+  max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dd { background: rgba(0,0,0,.18); color: var(--b-text); border-radius: 5px; padding: 1px 8px; font-weight: 700; font-size: 13.5px; white-space: nowrap; }
+.dd::after { content: " ▾"; font-size: 11px; opacity: .85; }
+.dd.empty { background: rgba(255,255,255,.28); }
+/* editable slots on script blocks */
+input.in, select.dd { font-family: inherit; border: 0; margin: 0; line-height: 1.45; }
+#stack input.in { border: 0; border-radius: 999px; padding: 1px 9px; background: var(--slot); color: var(--slot-ink); font-weight: 650; font-size: 13.5px; height: auto; }
+#stack select.dd { field-sizing: content; }
+input.in { text-align: center; cursor: text; user-select: text; -webkit-user-select: text; max-width: 320px; }
+input.in.txt { text-align: left; }
+input.in::placeholder { color: var(--muted); opacity: 1; }
+input.in:hover { box-shadow: 0 0 0 2px rgba(255,255,255,.55); }
+select.dd {
+  appearance: none; -webkit-appearance: none; cursor: pointer; padding: 1px 22px 1px 8px; max-width: 220px;
+  background: rgba(0,0,0,.2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='white'/%3E%3C/svg%3E") no-repeat right 7px center / 9px 6px;
+}
+select.dd.empty { background-color: rgba(255,255,255,.28); }
+select.dd:hover { background-color: rgba(0,0,0,.3); }
+select.dd option { color: #1a2130; background: #ffffff; font-weight: 500; }
+input.in:focus, select.dd:focus { outline: 2px solid var(--b-text); outline-offset: 1px; }
+.spec { font-weight: 600; font-size: 12px; opacity: .8; }
+.badge { width: 19px; height: 19px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 12.5px; font-weight: 800; color: #fff; background: var(--fault); box-shadow: 0 0 0 2px var(--b-text); }
+.badge.warn { background: var(--warn); }
+.blk.sel .shape { box-shadow: inset 0 -2px 0 rgba(0,0,0,.16), 0 0 0 3px var(--ink); }
+.blk.running .shape { box-shadow: 0 0 0 4px var(--glow), 0 0 16px 4px color-mix(in srgb, var(--glow) 60%, transparent); }
+.blk.ran .n { color: var(--ok); }
+.blk.lifted { display: none; }
+.ph { height: 46px; width: 220px; margin: 0 0 0 30px; border-radius: 5px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+#stack > .ph { margin-block: 4px; }
+.dragghost { position: fixed; z-index: 50; pointer-events: none; filter: drop-shadow(0 8px 14px rgba(0,0,0,.28)); opacity: .95; }
+.dragghost .n { display: none; }
+.trash .shelf { background: color-mix(in srgb, var(--fault) 10%, var(--sheet)); }
+
+/* canvas */
+.canvas {
+  --under: var(--canvas); position: relative; padding: 18px 18px 120px 6px;
+  background-color: var(--canvas); background-image: radial-gradient(var(--dot) 1.2px, transparent 1.3px); background-size: 22px 22px;
+}
+.canvas.over { outline: 2px dashed color-mix(in srgb, var(--iodine) 60%, transparent); outline-offset: -6px; }
+.endhint { margin: 26px 0 0 30px; color: var(--muted); font-size: 13.5px; max-width: 46ch; }
+.endhint b { color: var(--ink); }
+.totals { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); padding: 6px 12px; margin: -18px -18px 14px -6px; background: color-mix(in srgb, var(--canvas) 92%, transparent); border-bottom: 1px solid var(--rule); }
+.totals b { color: var(--ink); }
+
+/* right: stage then editor */
+.right { border-left: 1px solid var(--rule); display: flex; flex-direction: column; overflow: hidden; }
+@media (max-width: 900px) { .right { border-left: 0; border-bottom: 1px solid var(--rule); overflow: visible; } }
+.stagebox { flex: none; padding: 10px 12px 10px; border-bottom: 1px solid var(--rule); }
+.stagebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.flag { display: inline-flex; align-items: center; gap: 6px; }
+.flag svg { width: 18px; height: 18px; }
+.iconbtn { width: 34px; height: 32px; padding: 0; display: inline-grid; place-items: center; }
+.iconbtn svg { width: 18px; height: 18px; }
+.stagebar .spacer { flex: 1; }
+.plan { background: var(--epoxy); border-radius: 6px; }
+.plan svg { display: block; width: 100%; height: auto; max-width: 100%; max-height: 34vh; }
+@media (max-width: 900px) { .plan svg { max-height: none; } }
+.cap { font-size: 13px; margin-top: 6px; color: var(--muted); min-height: 2.8em; }
+.cap b { color: var(--ink); }
+.svg-reach { fill: none; stroke: var(--rule); stroke-dasharray: 3 5; }
+.svg-st { fill: var(--sheet); stroke: var(--muted); stroke-width: 1; }
+.svg-st.hot { stroke: var(--iodine); stroke-width: 2.2; }
+.svg-st.checking { stroke: var(--ok); stroke-width: 2.2; }
+.svg-label { fill: var(--muted); font-size: 11.5px; font-family: var(--face); }
+.svg-label.hot { fill: var(--ink); font-weight: 700; }
+.svg-tag { fill: var(--ink); }
+.svg-tagid { fill: var(--sheet); font-size: 7px; font-family: var(--face); font-weight: 700; }
+.svg-arm { stroke: var(--ink); stroke-width: 9; stroke-linecap: round; fill: none; opacity: .82; }
+.svg-joint { fill: var(--sheet); stroke: var(--ink); stroke-width: 2; }
+.svg-base { fill: var(--ink); }
+.svg-flask { fill: var(--sheet); stroke: var(--ink); stroke-width: 1.4; }
+.svg-flask.iodine { fill: var(--iodine); }
+.svg-flask.held { stroke: var(--iodine); stroke-width: 2.2; }
+.svg-neck { fill: var(--glass); stroke: var(--ink); stroke-width: 1; }
+.svg-item { fill: var(--ink); font-size: 9.5px; font-family: var(--face); font-weight: 600; }
+.svg-note { fill: var(--muted); font-size: 9.5px; font-family: var(--face); }
+
+.tabs { flex: none; display: flex; gap: 2px; border-bottom: 1px solid var(--rule); padding: 0 8px; }
+.tabs button { border: 0; background: transparent; padding: 8px 10px; cursor: pointer; color: var(--muted); font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--iodine); }
+.panel { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px 20px; font-size: 14px; display: grid; gap: 12px; align-content: start; }
+@media (max-width: 900px) { .panel { overflow: visible; } }
+.panel h3 { font-size: 14px; margin: 0; font-weight: 700; }
+.edhead { display: flex; align-items: center; gap: 10px; }
+.edhead .sw { width: 14px; height: 14px; border-radius: 4px; background: var(--c); flex: none; }
+.edhead h3 { font-size: 17px; font-stretch: 108%; }
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 12px; }
+.form label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+.form label.check { display: flex; align-items: center; gap: 7px; color: var(--ink); }
+.form label.wide { grid-column: 1 / -1; }
+.issue { font-size: 13.5px; }
+.issue.error { color: var(--fault); } .issue.warn { color: var(--warn); } .issue.info { color: var(--muted); }
+.tagrow { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-size: 12px; padding: 1px 7px; border-radius: 4px; background: var(--epoxy); white-space: nowrap; }
+.tag.gr { background: var(--violet-soft); color: var(--violet); }
+.tag.op { background: var(--warn-soft); color: var(--warn); }
+.tbar { position: relative; height: 10px; background: var(--epoxy); border-radius: 2px; }
+.tbar .fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--ink); border-radius: 2px; }
+.tbar .tol { position: absolute; top: -3px; bottom: -3px; border-left: 1px solid var(--iodine); border-right: 1px solid var(--iodine); background: color-mix(in srgb, var(--iodine) 22%, transparent); }
+.tscale { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--rule); background: var(--sheet); border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 13.5px; }
+.chip button { border: 0; background: transparent; cursor: pointer; color: var(--muted); padding: 0 6px; border-radius: 999px; }
+.chip button:hover { color: var(--fault); }
+.startadd { display: flex; gap: 6px; flex-wrap: wrap; }
+.startadd input { width: 110px; }
+.verdict { font-weight: 650; }
+.verdict.ok { color: var(--ok); } .verdict.bad { color: var(--fault); }
+.ilist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ilist button { border: 0; background: transparent; padding: 0; cursor: pointer; text-align: left; color: inherit; }
+.ilist .go { font-weight: 650; color: var(--ink); margin-right: 4px; }
+.ilist button:hover .go { text-decoration: underline; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th { text-align: left; font-weight: 600; color: var(--muted); padding: 4px 6px 4px 0; border-bottom: 1px solid var(--rule); }
+td { padding: 5px 6px 5px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.tablewrap { overflow-x: auto; }
+pre.yaml { margin: 0; padding: 12px; background: var(--canvas); border: 1px solid var(--rule); border-radius: 6px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; overflow-x: auto; white-space: pre; user-select: all; }
+.pass { color: var(--ok); font-weight: 600; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.signoff { display: grid; gap: 8px; padding: 10px; margin-top: 8px; border: 1px solid var(--iodine); border-radius: 6px; background: var(--iodine-soft); font-size: 13.5px; }
+.signoff .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.confirm { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--glass); padding: 9px 12px 9px 16px; border-radius: 6px; font-size: 14px; max-width: min(560px, calc(100vw - 32px)); box-shadow: 0 6px 24px rgba(0,0,0,.22); z-index: 60; display: flex; gap: 12px; align-items: center; }
+.toast button { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-weight: 650; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+
+</head><body>
+<header class="top">
+  <div class="ident">
+    <span class="who">Walter procedure builder</span>
+    <label class="sr" for="procName">Procedure name</label>
+    <input id="procName" type="text" spellcheck="false" autocomplete="off">
+  </div>
+  <div class="life" id="life"></div>
+  <div class="procbar">
+    <label class="sr" for="procPick">Open procedure</label>
+    <select id="procPick"></select>
+    <button class="btn small" id="newProc" type="button">New</button>
+    <button class="btn small" id="dupProc" type="button">Duplicate</button>
+    <span id="delWrap"></span>
+  </div>
+</header>
+<div class="practice" role="note"><b>Not connected to the arm.</b> Every block is a Python helper for the FAIRINO FR3 (<code>walter_fr3</code>). Build here, dry-run the animation, then copy the Python or YAML tab and run it yourself. Procedures are saved in this browser only.</div>
+
+<div class="work" id="work">
+  <aside class="pane shelf" aria-label="Blocks and stations">
+    <div id="shelf"></div>
+    <p class="hint">Drag a block into the script. Drag a block from the script back here to delete it.</p>
+    <div>
+      <h2>Stations</h2>
+      <div class="stations" id="stationList"></div>
+      <button class="btn small" id="toggleAddSt" type="button" style="margin-top:8px">Add station</button>
+      <form class="addst" id="addSt" hidden>
+        <label for="stName">Name<input id="stName" type="text" placeholder="counter" autocomplete="off"></label>
+        <label for="stDesc">What is there<input id="stDesc" type="text" placeholder="Bench space by the sink" autocomplete="off"></label>
+        <label class="row" for="stTag"><input id="stTag" type="checkbox"> Has an AprilTag</label>
+        <div class="row"><button class="btn small primary" type="submit">Add station</button><button class="btn small ghost" type="button" id="cancelSt">Cancel</button></div>
+      </form>
+    </div>
+  </aside>
+
+  <main class="pane canvas" id="canvas" aria-label="Script">
+    <div class="totals" id="totals"></div>
+    <div class="hatwrap" id="hat"></div>
+    <div id="stack"></div>
+    <div class="endhint" id="endhint"></div>
+  </main>
+
+  <aside class="pane right" aria-label="Dry run and block editor">
+    <div class="stagebox">
+      <div class="stagebar" id="stagebar"></div>
+      <div class="plan"><svg id="plan" viewBox="0 0 520 320" role="img" aria-labelledby="planCap"></svg></div>
+      <div class="cap" id="planCap"></div>
+      <div id="signoffBox"></div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-block" aria-selected="true" aria-controls="panel" type="button">Block</button>
+      <button role="tab" id="tab-checks" aria-selected="false" aria-controls="panel" type="button">Checks</button>
+      <button role="tab" id="tab-py" aria-selected="false" aria-controls="panel" type="button">Python</button>
+      <button role="tab" id="tab-yaml" aria-selected="false" aria-controls="panel" type="button">YAML</button>
+      <button role="tab" id="tab-log" aria-selected="false" aria-controls="panel" type="button">Run log</button>
+    </div>
+    <div class="panel" id="panel" role="tabpanel"></div>
+  </aside>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(() => {
+// ---------- vocabulary: one block per Python helper in controls/fr3_python/walter_fr3/helpers.py ----------
+// Block names and parameter names are the helper's name and arguments (tests/test_walter_fr3.py checks this).
+const GROUPS = [['move', 'Motion'], ['timed', 'Timing and mixing'], ['check', 'Checks'], ['people', 'Operator and data']];
+const P = {
+  station: (label, def) => ({ t: 'station', label, d: def ?? null }),
+  num: (label, d, extra) => ({ t: 'num', label, d, ...extra }),
+  bool: (label, d) => ({ t: 'bool', label, d }),
+  text: (label, d, extra) => ({ t: 'text', label, d, ...extra }),
+};
+const SKILLS = {
+  pick:       { label: 'Pick up', group: 'move', help: 'Pick up the flask or beaker at a station: check it, open, reach in, grasp, lift.',
+                params: { station: P.station('From'), verify: P.bool("Check the station's tag first", true),
+                          recover: P.text('If the check fails, GR00T tries', '', { wide: true, ph: 'slide the rack back onto its marks' }),
+                          seconds: P.num('Seconds per move', 2, { min: 0.5, step: 0.5 }) } },
+  place:      { label: 'Place', group: 'move', help: 'Set the held item down at a station and back away.',
+                params: { station: P.station('On'), verify: P.bool("Check the station's tag first", true),
+                          recover: P.text('If the check fails, GR00T tries', '', { wide: true }),
+                          seconds: P.num('Seconds per move', 2, { min: 0.5, step: 0.5 }) } },
+  move_to:    { label: 'Move to', group: 'move', help: 'Move to a taught pose at a station.',
+                params: { station: P.station('Station'), pose: { t: 'pose', label: 'Pose', d: 'above' },
+                          seconds: P.num('Seconds', 3, { min: 0.5, step: 0.5 }) } },
+  home:       { label: 'Go home', group: 'move', help: 'Return to the safe pose clear of everything.',
+                params: { seconds: P.num('Seconds', 3, { min: 0.5, step: 0.5 }) } },
+  hold_under: { label: 'Hold under', group: 'move', help: 'Hold the item under a fixed station, like the dispenser.',
+                params: { station: P.station('Under', 'dispenser'), seconds: P.num('Seconds', 2, { min: 0.5, step: 0.5 }) } },
+  dispense:   { label: 'Dispense', group: 'move', help: 'Hold the flask under the dispenser and dispense a volume (output pulse, or the operator presses it).',
+                params: { ml: P.num('Volume (mL)', 100, { min: 1, step: 1 }), station: P.station('Under', 'dispenser'),
+                          reagent: P.text('Reagent', '0.100 N iodine', { wide: true }) } },
+  pour:       { label: 'Pour', group: 'move', help: 'Tilt the held flask over a station, hold, and tilt back.',
+                params: { station: P.station('Into', 'funnel'), hold_s: P.num('Hold for (s)', 5, { min: 0, step: 0.5 }),
+                          tilt_s: P.num('Tilt over (s)', 3, { min: 0.5, step: 0.5 }), verify: P.bool("Check the station's tag first", true),
+                          recover: P.text('If the check fails, GR00T tries', '', { wide: true }) } },
+  swirl:      { label: 'Swirl', group: 'timed', help: 'Swirl the held flask or beaker in place: the wrist traces a small circle.',
+                params: { seconds: P.num('Seconds', 10, { min: 1, step: 1 }), amplitude_deg: P.num('Circle size (°)', 6, { min: 1, max: 15, step: 1 }),
+                          frequency_hz: P.num('Turns per second', 1.5, { min: 0.5, max: 3, step: 0.5 }) } },
+  shake:      { label: 'Shake', group: 'timed', timed: true, help: 'Move to the shake station and shake the held, stoppered flask hard.',
+                params: { seconds: P.num('Seconds', 30, { min: 1, step: 1 }), tolerance_s: P.num('Tolerance ± s', 1, { min: 0, step: 0.5 }),
+                          amplitude_deg: P.num('Swing each way (°)', 10, { min: 1, max: 30, step: 1 }), frequency_hz: P.num('Shakes per second', 2.5, { min: 0.5, max: 4, step: 0.5 }) } },
+  boil:       { label: 'Boil', group: 'timed', timed: true, help: 'Time the boil of the flask on the hot plate, then lift it off on time. The gripper ends up holding the flask.',
+                params: { seconds: P.num('Seconds', 30, { min: 1, step: 1 }), tolerance_s: P.num('Tolerance ± s', 2, { min: 0, step: 0.5 }),
+                          station: P.station('On', 'hotplate'), confirm_start: P.bool('Operator confirms when the boil starts', true) } },
+  wait:       { label: 'Wait', group: 'timed', timed: true, help: 'Wait a fixed time.',
+                params: { seconds: P.num('Seconds', null, { min: 0.1, step: 1 }), tolerance_s: P.num('Tolerance ± s (0 = not a D4607 timed step)', 0, { min: 0, step: 0.5, wide: true }) } },
+  cool:       { label: 'Cool', group: 'timed', help: 'Let flasks cool to room temperature: wait, then the operator confirms.',
+                params: { minutes: P.num('Minutes', 15, { min: 0, step: 1 }), confirm: P.bool('Operator confirms room temperature', true) } },
+  verify:     { label: 'Check placement', group: 'check', help: "Check that a station's equipment sits on its marks.",
+                params: { station: P.station('Station'), recover: P.text('If it is off, GR00T tries', '', { wide: true }),
+                          retries: P.num('GR00T attempts before asking you', 1, { min: 0, max: 3, step: 1, wide: true }) } },
+  operator:   { label: 'Ask the operator', group: 'people', help: 'Pause until a person does something and confirms.',
+                params: { prompt: P.text('What the operator should do', null, { wide: true, ph: 'Stopper the flask' }) } },
+  record:     { label: 'Record a value', group: 'people', help: 'Ask the operator for a number (a mass, a titration volume) and keep it for the report.',
+                params: { key: P.text('Name', null, { ph: 'thio_flask_1' }), prompt: P.text('Question for the operator', null, { wide: true, ph: 'Thiosulfate used for flask 1, mL' }) } },
+  report:     { label: 'Report iodine number', group: 'people', help: 'D4607 section 11: compute X/M and C per flask from the recorded N1, N2, mass_<flask> and thio_<flask> values, fit the isotherm, report the iodine number.',
+                params: { hcl_ml: P.num('HCl added (mL)', 10, { min: 0, step: 1 }), iodine_ml: P.num('Iodine added (mL)', 100, { min: 1, step: 1 }),
+                          filtrate_ml: P.num('Filtrate titrated (mL)', 50, { min: 1, step: 1 }) } },
+};
+const COMMON = { spec: P.text('D4607 section', '', { ph: '10.4' }), label: P.text('Log label', '', { ph: 'boil' }) };
+
+const BUILTIN = [   // mirrors walter_fr3/stations_fr3_d4607.yaml
+  { name: 'rack_1',     description: 'Flask rack, slot 1', tag: 1, poses: ['above', 'grasp'], x: 40,  y: 215 },
+  { name: 'rack_2',     description: 'Flask rack, slot 2', tag: 5, poses: ['above', 'grasp'], x: 92,  y: 215 },
+  { name: 'rack_3',     description: 'Flask rack, slot 3', tag: 6, poses: ['above', 'grasp'], x: 144, y: 215 },
+  { name: 'hotplate',   description: 'Hot plate',          tag: 2, poses: ['above', 'grasp'], x: 260, y: 48 },
+  { name: 'cool_pad',   description: 'Cooling pad, spot 1', tag: 3, poses: ['above', 'grasp'], x: 352, y: 215 },
+  { name: 'cool_pad_2', description: 'Cooling pad, spot 2', tag: 7, poses: ['above', 'grasp'], x: 416, y: 215 },
+  { name: 'cool_pad_3', description: 'Cooling pad, spot 3', tag: 8, poses: ['above', 'grasp'], x: 480, y: 215 },
+  { name: 'funnel',     description: 'Filter funnel 1 over its beaker', tag: 4, poses: ['above', 'pour'], x: 84,  y: 138 },
+  { name: 'funnel_2',   description: 'Filter funnel 2 over its beaker', tag: 9, poses: ['above', 'pour'], x: 140, y: 138 },
+  { name: 'funnel_3',   description: 'Filter funnel 3 over its beaker', tag: 10, poses: ['above', 'pour'], x: 196, y: 138 },
+  { name: 'dispenser',  description: 'Iodine dispenser (fixed)', tag: null, poses: ['under'], x: 330, y: 138 },
+  { name: 'shake',      description: 'Free space for shaking', tag: null, poses: ['start'], x: 392, y: 138 },
+  { name: 'filtrate',   description: 'Spot for the filtrate beaker', tag: 11, poses: ['above', 'grasp'], x: 454, y: 138 },
+  { name: 'home',       description: 'Safe pose clear of everything', tag: null, poses: ['home'], x: 260, y: 172 },
+];
+const SLOTS = [[210, 225], [304, 225], [170, 60], [350, 60], [260, 108], [100, 72], [420, 72]];
+const BASE = { x: 260, y: 300 }, L1 = 134, L2 = 134, SW = 46, SH = 28;
+
+// ---------- storage ----------
+const KEY = 'walter-builder-v1';
+let uid = Date.now() % 100000;
+const id = () => 'x' + (uid++).toString(36);
+const step = (skill, params) => ({ id: id(), skill, params: params || {} });
+
+function seed() {
+  const d4607 = {
+    id: id(), name: 'd4607_flask_1', status: 'draft',
+    start: [{ item: 'flask_1', at: 'rack_1' }],
+    steps: [
+      step('operator', { prompt: 'Flask 1 (carbon + 10.0 mL 5% HCl, stopper loosened) in rack slot 1; hot plate on; funnel ready', spec: '10.3-10.4' }),
+      step('verify', { station: 'funnel', recover: 'slide the funnel stand back onto its marks' }),
+      step('verify', { station: 'cool_pad' }),
+      step('pick', { station: 'rack_1', spec: '10.4' }),
+      step('place', { station: 'hotplate', spec: '10.4' }),
+      step('home', {}),
+      step('operator', { prompt: 'Confirm the flask contents are boiling', label: 'boil_started' }),
+      step('wait', { seconds: 30, tolerance_s: 2, label: 'boil', spec: '10.4' }),
+      step('pick', { station: 'hotplate', spec: '10.4' }),
+      step('place', { station: 'cool_pad', spec: '10.4' }),
+      step('home', {}),
+      step('operator', { prompt: 'Confirm flask 1 is at room temperature', label: 'cooled' }),
+      step('pick', { station: 'cool_pad', spec: '10.5' }),
+      step('hold_under', { station: 'dispenser', spec: '10.5' }),
+      step('operator', { prompt: 'Dispense 100.0 mL iodine and seat the stopper', label: 'iodine_added' }),
+      step('shake', { seconds: 30, tolerance_s: 1, spec: '10.5' }),
+      step('move_to', { station: 'funnel', pose: 'above', seconds: 1.5 }),
+      step('operator', { prompt: 'Remove the stopper from flask 1', label: 'unstopper' }),
+      step('pour', { station: 'funnel', hold_s: 8, spec: '10.5' }),
+      step('home', {}),
+    ],
+  };
+  const beaker = {
+    id: id(), name: 'beaker_to_counter', status: 'draft',
+    start: [{ item: 'beaker_1', at: 'rack_1' }],
+    steps: [
+      step('verify', { station: 'rack_1', recover: 'push the beaker rack back onto its marks' }),
+      step('pick', { station: 'rack_1' }),
+      step('place', { station: 'counter', verify: false }),
+      step('home', {}),
+    ],
+  };
+  const full = d4607Full();
+  return {
+    custom: [{ name: 'counter', description: 'Bench space by the sink', tag: null, poses: ['above', 'grasp'], custom: true }],
+    procs: [beaker, d4607, full], current: full.id, v: 2,
+  };
+}
+// ASTM D4607 for three flasks, block for block the same run as walter_fr3/d4607.py.
+function d4607Full() {
+  const F = [['flask_1', 'rack_1', 'cool_pad', 'funnel'], ['flask_2', 'rack_2', 'cool_pad_2', 'funnel_2'], ['flask_3', 'rack_3', 'cool_pad_3', 'funnel_3']];
+  const steps = [
+    step('operator', { prompt: 'Solutions ready: 5% HCl, 0.100 N thiosulfate, 0.100 N iodine, fresh starch. Carbon ground, dried and cooled', spec: '8-10.2' }),
+    step('record', { key: 'N1', prompt: 'Thiosulfate normality from the 9.1 standardization', spec: '9.1' }),
+    step('record', { key: 'N2', prompt: 'Iodine normality from the 9.2 standardization, done just before use', spec: '9.2' }),
+    ...F.map(f => step('record', { key: 'mass_' + f[0], prompt: `Mass of dry carbon weighed into ${f[0]}, g`, spec: '10.3' })),
+    step('operator', { prompt: 'Pipet 10.0 mL of 5% HCl into each flask, stopper them, and set them in rack slots 1 to 3. Hot plate on, funnels and filter paper ready', spec: '10.4' }),
+    step('verify', { station: 'hotplate' }),
+    ...F.flatMap(f => [step('pick', { station: f[1], spec: '10.4' }), step('swirl', { seconds: 10, spec: '10.4' }), step('place', { station: f[1], verify: false })]),
+    step('home', {}),
+    step('operator', { prompt: 'Check the carbon in all three flasks is fully wetted, then loosen the stoppers to vent', spec: '10.4' }),
+    ...F.flatMap(f => [step('pick', { station: f[1], spec: '10.4' }), step('place', { station: 'hotplate', spec: '10.4' }),
+                       step('boil', { spec: '10.4' }), step('place', { station: f[2], spec: '10.4' })]),
+    step('home', {}),
+    step('cool', { minutes: 15, spec: '10.4' }),
+    ...F.flatMap(f => [step('pick', { station: f[2], spec: '10.5' }), step('dispense', { ml: 100, spec: '10.5' }),
+                       step('operator', { prompt: `Stopper ${f[0]} firmly, right now`, spec: '10.5' }),
+                       step('shake', { seconds: 30, tolerance_s: 1, spec: '10.5' }),
+                       step('move_to', { station: f[3], pose: 'above', seconds: 1.5 }),
+                       step('operator', { prompt: `Remove the stopper from ${f[0]}`, spec: '10.5' }),
+                       step('pour', { station: f[3], hold_s: 8, spec: '10.5' }),
+                       step('place', { station: f[2], verify: false })]),
+    step('home', {}),
+    step('operator', { prompt: 'Wait for the filtrations. For each, rinse a pipet with the first 20 to 30 mL and discard it; collect the rest in a clean beaker. Set the flask_1 filtrate beaker on the filtrate spot', spec: '10.6' }),
+    ...F.flatMap((f, n) => [step('pick', { station: 'filtrate', spec: '10.6' }), step('swirl', { seconds: 6, amplitude_deg: 4, frequency_hz: 1, spec: '10.6' }),
+                       step('place', { station: 'filtrate', verify: false }), step('home', {}),
+                       step('operator', { prompt: `Pipet 50.0 mL of the ${f[0]} filtrate into a clean flask and titrate with thiosulfate (starch near the end)` + (n < 2 ? `. Then swap in the ${F[n + 1][0]} filtrate beaker` : ''), spec: '10.6' }),
+                       step('record', { key: 'thio_' + f[0], prompt: `Thiosulfate used for ${f[0]}, mL`, spec: '10.6' })]),
+    step('report', { spec: '11' }),
+  ];
+  return { id: id(), name: 'd4607_three_flasks', status: 'draft',
+           start: [...F.map(f => ({ item: f[0], at: f[1] })), { item: 'filtrate_beaker', at: 'filtrate' }], steps };
+}
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
+if (!S || !Array.isArray(S.procs) || !S.procs.length) S = seed();
+if (!S.v) {   // saved before the FR3 helpers existed: keep everything, add the new procedure, drop stations that are built in now
+  S.v = 2; S.custom = (S.custom || []).filter(c => !BUILTIN.some(b => b.name === c.name));
+  if (!S.procs.some(p => p.name === 'd4607_three_flasks')) S.procs.push(d4607Full());
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+const ui = { sel: null, tab: 'block', sim: null, confirmDel: false, signoff: false, armA: null, undo: null };
+const proc = () => S.procs.find(p => p.id === S.current) || S.procs[0];
+
+function stations() {
+  return BUILTIN.concat(S.custom.map((s, i) => ({ ...s, x: SLOTS[i % SLOTS.length][0], y: SLOTS[i % SLOTS.length][1] })));
+}
+const st = name => stations().find(s => s.name === name);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const val = (s, k) => {
+  const spec = SKILLS[s.skill].params[k] || COMMON[k];
+  const v = s.params[k];
+  if (!spec) return v;
+  return v === undefined || v === '' ? spec.d : v;
+};
+const fmtS = s => s >= 60 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : `${+s.toFixed(1)} s`;
+
+// ---------- analysis: the checks the real backend would do, minus MoveIt ----------
+function estimate(s) {
+  const v = k => +val(s, k) || 0;
+  switch (s.skill) {
+    case 'pick': case 'place': return v('seconds') * 3 + 1 + (val(s, 'verify') ? 0.5 : 0);
+    case 'move_to': case 'home': case 'hold_under': return v('seconds');
+    case 'dispense': return 2 + Math.max(3, v('ml') / 25);
+    case 'swirl': return v('seconds');
+    case 'boil': return 5 + v('seconds') + 1.5;
+    case 'cool': return v('minutes') * 60;
+    case 'pour': return v('tilt_s') * 2 + v('hold_s') + 1.5;
+    case 'shake': return 1.5 + v('seconds');
+    case 'wait': return v('seconds');
+    case 'verify': return 0.5;
+    default: return 0;
+  }
+}
+function analyze(p) {
+  const where = {}, contents = {};
+  (p.start || []).forEach(o => { where[o.item] = o.at; contents[o.item] = 'sample'; });
+  let holding = null, armAt = 'home';
+  const lastMoved = {}, recorded = new Set();
+  const at = name => Object.keys(where).find(k => where[k] === name);
+  const out = p.steps.map((s, i) => {
+    const sk = SKILLS[s.skill], issues = [];
+    const add = (level, msg) => issues.push({ level, msg });
+    const before = { holding, where: { ...where } };
+    for (const [k, spec] of Object.entries(sk.params)) {
+      const v = val(s, k);
+      if (spec.d === null && (v === null || v === undefined || v === '')) add('error', `${spec.label} is required.`);
+      if (spec.t === 'station' && v && !st(v)) add('error', `There is no station called ${v}.`);
+      if (spec.t === 'num' && v !== null && v !== '' && isNaN(+v)) add('error', `${spec.label} must be a number.`);
+      if (spec.t === 'num' && v !== null && v !== '' && spec.min !== undefined && +v < spec.min) add('error', `${spec.label} must be at least ${spec.min}.`);
+    }
+    const sn = val(s, 'station'), sta = sn && st(sn);
+    let recovery = null;
+    const checks = (s.skill === 'verify') || (['pick', 'place', 'pour'].includes(s.skill) && val(s, 'verify'));
+    for (const k of Object.keys(s.params)) if (!sk.params[k] && !COMMON[k]) delete s.params[k];
+    if (checks && sta) {
+      if (!sta.tag) {
+        if (s.skill === 'verify') add('error', `${sn} has no AprilTag, so there is nothing to check.`);
+        else add('info', `${sn} has no tag, so the placement check is skipped.`);
+      } else {
+        const rec = val(s, 'recover');
+        if (rec && holding) { recovery = 'operator'; add('warn', `GR00T only recovers with an empty gripper. The arm holds ${holding} here, so a failed check goes to the operator.`); }
+        else recovery = rec ? 'gr00t' : 'operator';
+      }
+    }
+    if (s.skill === 'move_to' && sta && !sta.poses.includes(val(s, 'pose'))) add('error', `${sn} has no taught pose called "${val(s, 'pose')}". It has: ${sta.poses.join(', ')}.`);
+    if (['hold_under', 'dispense'].includes(s.skill) && sta && !sta.poses.includes('under')) add('error', `${sn} has no "under" pose. ${sk.label} works at the dispenser.`);
+    if (s.skill === 'pour' && sta && !sta.poses.includes('pour')) add('error', `${sn} has no "pour" pose. Pour works at the funnel.`);
+    if (['place', 'hold_under', 'dispense', 'pour', 'shake', 'swirl'].includes(s.skill) && !holding) add('error', `The gripper is empty here, so there is nothing to ${s.skill === 'hold_under' ? 'hold' : s.skill === 'dispense' ? 'dispense into' : s.skill}.`);
+    if (s.skill === 'boil' && sta) {
+      const it = at(sn);
+      if (holding) add('error', `The gripper holds ${holding}. Place it on ${sn} before the boil; the arm lifts it off again when the time is up.`);
+      else if (!it) add('error', `Nothing is on ${sn} to boil. Place a flask there first.`);
+      else { holding = it; delete where[it]; lastMoved[it] = { from: sn, step: i + 1 }; }
+    }
+    if (s.skill === 'cool' && holding) add('warn', `The arm holds ${holding} for the whole cool-down. Place it first.`);
+    if (s.skill === 'record' && val(s, 'key') && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(val(s, 'key'))) add('error', 'Name must be letters, digits and underscores, like thio_flask_1.');
+    if (s.skill === 'record' && val(s, 'key')) recorded.add(val(s, 'key'));
+    if (s.skill === 'report') {
+      const fl = [...recorded].filter(k => k.startsWith('mass_') && recorded.has('thio_' + k.slice(5)));
+      for (const k of ['N1', 'N2']) if (!recorded.has(k)) add('error', `Record a value named ${k} before the report.`);
+      if (fl.length < 2) add('error', 'The report needs at least two flasks, each with a recorded mass_<flask> and thio_<flask>. D4607 uses three.');
+      else if (fl.length < 3) add('warn', 'D4607 asks for three carbon dosages; only two are recorded.');
+    }
+    if (s.skill === 'pick' && sta) {
+      if (holding) add('error', `The gripper already holds ${holding}. Place it before picking again.`);
+      else {
+        const it = at(sn);
+        if (!it) {
+          const gone = Object.keys(lastMoved).find(k => lastMoved[k].from === sn);
+          add('error', gone ? `Nothing is at ${sn} by now. ${gone} left it in step ${lastMoved[gone].step}.` : `Nothing is at ${sn} at this point. Put something there in the starting layout (click the yellow block) or place something there first.`);
+        } else { holding = it; delete where[it]; lastMoved[it] = { from: sn, step: i + 1 }; }
+      }
+    }
+    if (s.skill === 'place' && sta && holding) {
+      const it = at(sn);
+      if (it) add('error', `${sn} already has ${it} on it.`);
+      else { where[holding] = sn; holding = null; }
+    }
+    if (['hold_under', 'dispense'].includes(s.skill) && holding && sn === 'dispenser') contents[holding] = 'iodine';
+    if (s.skill === 'pour' && holding) contents[holding] = 'empty';
+    if (s.skill === 'wait' && +val(s, 'tolerance_s') > 0 && +val(s, 'seconds') <= +val(s, 'tolerance_s')) add('error', 'The tolerance is as long as the wait itself.');
+    if (['pick', 'place', 'move_to', 'hold_under', 'dispense', 'boil', 'pour'].includes(s.skill) && sn) armAt = sn;
+    if (s.skill === 'home') armAt = 'home';
+    if (s.skill === 'shake') armAt = 'shake';
+    return { issues, recovery, est: estimate(s), before, after: { holding, where: { ...where }, contents: { ...contents }, armAt },
+             level: issues.some(x => x.level === 'error') ? 'error' : issues.some(x => x.level === 'warn') ? 'warn' : null };
+  });
+  const end = [];
+  if (holding) end.push({ level: 'warn', msg: `The procedure ends with ${holding} still in the gripper.` });
+  if (!p.steps.length) end.push({ level: 'error', msg: 'Add at least one block.' });
+  const errors = out.reduce((n, r) => n + r.issues.filter(x => x.level === 'error').length, 0) + end.filter(x => x.level === 'error').length;
+  const start = { holding: null, where: Object.fromEntries((p.start || []).map(o => [o.item, o.at])), contents: Object.fromEntries((p.start || []).map(o => [o.item, 'sample'])), armAt: 'home' };
+  return { steps: out, end, errors, start,
+           total: out.reduce((n, r) => n + r.est, 0), operators: p.steps.filter(s => ['operator', 'record'].includes(s.skill)).length };
+}
+
+function summary(s, r) {
+  const sn = val(s, 'station'), d = sn && st(sn) ? st(sn).description : (sn || 'a station');
+  const item = r.before.holding || (sn && Object.keys(r.before.where).find(k => r.before.where[k] === sn));
+  switch (s.skill) {
+    case 'pick': return `Pick up ${item || 'the item'} from ${d.toLowerCase()}`;
+    case 'place': return `Set ${r.before.holding || 'the held item'} down on ${d.toLowerCase()}`;
+    case 'move_to': return `Move to the "${val(s, 'pose')}" pose at ${d.toLowerCase()}`;
+    case 'home': return 'Return to the safe pose';
+    case 'hold_under': return `Hold ${r.before.holding || 'the item'} under the ${d.toLowerCase()}`;
+    case 'dispense': return `Dispense ${val(s, 'ml')} mL ${val(s, 'reagent')} into ${r.before.holding || 'the flask'}`;
+    case 'swirl': return `Swirl ${r.before.holding || 'the flask'} for ${val(s, 'seconds')} s`;
+    case 'boil': return `Boil ${item || 'the flask'} for ${val(s, 'seconds')} s ± ${val(s, 'tolerance_s')} s, then lift it off`;
+    case 'cool': return `Cool for ${val(s, 'minutes')} min`;
+    case 'record': return `Record ${val(s, 'key') || 'a value'}: ${val(s, 'prompt') || ''}`;
+    case 'report': return 'Calculate and report the iodine number';
+    case 'pour': return `Pour into the ${d.toLowerCase()}, hold ${val(s, 'hold_s')} s`;
+    case 'wait': return `Wait ${val(s, 'seconds') || '?'} s` + (+val(s, 'tolerance_s') ? ` ± ${val(s, 'tolerance_s')} s` : '');
+    case 'shake': return `Shake ${r.before.holding || 'the flask'} for ${val(s, 'seconds')} s ± ${val(s, 'tolerance_s')} s`;
+    case 'verify': return `Check that ${d.toLowerCase()} sits on its marks`;
+    case 'operator': return val(s, 'prompt') || 'Ask the operator';
+  }
+}
+
+// ---------- block faces, Scratch style ----------
+const dd = v => v ? `<span class="dd">${esc(v)}</span>` : `<span class="dd empty">station</span>`;
+const num = v => `<span class="in">${esc(v === null || v === undefined || v === '' ? '?' : v)}</span>`;
+const txt = v => `<span class="in">${esc(v || '…')}</span>`;
+// width of an editable slot follows its text, like Scratch
+const slotWidth = (text, txtSlot) => `calc(${Math.min(txtSlot ? 40 : 10, Math.max(txtSlot ? 10 : 2, String(text).length || 1))}ch + 20px)`;
+function fitSlot(el) { el.style.width = slotWidth(el.value || el.placeholder, el.classList.contains('txt')); }
+const plabel = (s, k) => esc((SKILLS[s.skill].params[k] || COMMON[k]).label);
+function slotStation(s, k, edit) {
+  const v = val(s, k);
+  if (!edit) return dd(v);
+  return `<select class="dd${v ? '' : ' empty'}" data-k="${k}" aria-label="${plabel(s, k)}"><option value="">station</option>${
+    stations().filter(x => x.name !== 'home').map(x => `<option value="${esc(x.name)}"${x.name === v ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`;
+}
+function slotPose(s, edit) {
+  const v = val(s, 'pose'), sx = st(val(s, 'station'));
+  if (!edit) return `<span class="dd">${esc(v)}</span>`;
+  const poses = sx ? sx.poses : [v];
+  return `<select class="dd" data-k="pose" aria-label="Pose">${(poses.includes(v) ? poses : [v].concat(poses)).map(x => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
+}
+function slotNum(s, k, edit) {
+  const v = val(s, k);
+  if (!edit) return num(v);
+  const t = v === null || v === undefined ? '' : String(v);
+  return `<input class="in" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" data-k="${k}" value="${esc(t)}" placeholder="?" aria-label="${plabel(s, k)}" style="width:${slotWidth(t || '?')}">`;
+}
+function slotText(s, k, edit) {
+  const v = val(s, k);
+  if (!edit) return txt(v);
+  const ph = (SKILLS[s.skill].params[k] || {}).ph || '';
+  return `<input class="in txt" type="text" autocomplete="off" data-k="${k}" value="${esc(v || '')}" placeholder="${esc(ph)}" aria-label="${plabel(s, k)}" style="width:${slotWidth(v || ph, true)}">`;
+}
+function face(s, edit) {
+  const S = k => slotStation(s, k, edit), N = k => slotNum(s, k, edit);
+  switch (s.skill) {
+    case 'pick': return `pick up from ${S('station')}`;
+    case 'place': return `place on ${S('station')}`;
+    case 'move_to': return `move to ${S('station')} pose ${slotPose(s, edit)} in ${N('seconds')} s`;
+    case 'home': return `go home in ${N('seconds')} s`;
+    case 'hold_under': return `hold under ${S('station')}`;
+    case 'dispense': return `dispense ${N('ml')} mL under ${S('station')}`;
+    case 'swirl': return `swirl for ${N('seconds')} s`;
+    case 'boil': return `boil on ${S('station')} for ${N('seconds')} s ± ${N('tolerance_s')} then lift off`;
+    case 'cool': return `cool for ${N('minutes')} min`;
+    case 'record': return `record ${slotText(s, 'key', edit)} asking ${slotText(s, 'prompt', edit)}`;
+    case 'report': return `report iodine number`;
+    case 'pour': return `pour into ${S('station')} hold ${N('hold_s')} s`;
+    case 'wait': return `wait ${N('seconds')} s ± ${N('tolerance_s')}`;
+    case 'shake': return `shake for ${N('seconds')} s ± ${N('tolerance_s')}`;
+    case 'verify': return `check ${S('station')} is on its marks`;
+    case 'operator': return `ask operator ${slotText(s, 'prompt', edit)}`;
+  }
+}
+function blockHTML(s, i, r) {
+  const sk = SKILLS[s.skill];
+  const badge = r && r.level ? `<span class="badge${r.level === 'warn' ? ' warn' : ''}" title="${esc(r.issues.filter(x => x.level !== 'info')[0].msg)}">!</span>` : '';
+  const spec = val(s, 'spec') ? `<span class="spec">§${esc(val(s, 'spec'))}</span>` : '';
+  return `<div class="blk" data-id="${s.id}" tabindex="0" role="group" aria-label="Step ${i + 1}: ${esc(sk.label)}${r && r.level ? ', has a problem' : ''}">
+    <span class="n">${i + 1}</span><div class="shape f-${sk.group}">${face(s, true)}${spec}${badge}</div></div>`;
+}
+function shelfBlockHTML(k) {
+  const sk = SKILLS[k], s = { skill: k, params: {} };
+  return `<div class="blk" data-skill="${k}" tabindex="0" role="button" aria-label="${esc(sk.label)} block. Drag into the script, or press Enter to add it." title="${esc(sk.help)}"><div class="shape f-${sk.group}">${face(s)}</div></div>`;
+}
+
+// ---------- YAML in the walter_skills procedure format ----------
+function yv(v) {
+  if (typeof v === 'boolean' || typeof v === 'number') return String(v);
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(v) && !['true', 'false', 'yes', 'no', 'null', 'on', 'off'].includes(v.toLowerCase()) ? v : JSON.stringify(v);
+}
+function toYaml(p) {
+  const lines = [`# Built in the Walter procedure builder.`];
+  if ((p.start || []).length) lines.push(`# Start: ${p.start.map(o => `${o.item} at ${o.at}`).join(', ')}`);
+  if (p.status === 'approved') lines.push(`# Approved for the arm by ${p.approvedBy} on ${p.approvedAt}`);
+  lines.push(`name: ${yv(p.name)}`, 'steps:');
+  for (const s of p.steps) {
+    const sk = SKILLS[s.skill], kv = [];
+    for (const [k, spec] of Object.entries({ ...sk.params, ...COMMON })) {
+      const v = s.params[k];
+      if (v === undefined || v === '' || v === null || v === spec.d) continue;
+      kv.push(`${k}: ${yv(spec.t === 'num' ? +v : v)}`);
+    }
+    lines.push(`  - ${s.skill}: {${kv.join(', ')}}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+// ---------- Python: the same procedure as calls to the walter_fr3 helpers ----------
+function pyv(v) { return typeof v === 'boolean' ? (v ? 'True' : 'False') : typeof v === 'number' ? String(v) : JSON.stringify(String(v)); }
+function toPython(p) {
+  const L = [`"""${p.name}: built in the Walter procedure builder.`, '',
+    `    python ${p.name}.py                      dry run, no robot`,
+    `    python ${p.name}.py --ip 192.168.58.2    run it on the FR3`, '',
+    'Needs controls/fr3_python on PYTHONPATH (or run it from that folder).', '"""',
+    'from walter_fr3.session import main_for', '', '', 'def procedure(w):'];
+  if (p.status === 'approved') L.push(`    # Approved for the arm by ${p.approvedBy} on ${p.approvedAt}`);
+  for (const o of p.start || []) L.push(`    w.items[${pyv(o.at)}] = ${pyv(o.item)}   # starting layout`);
+  for (const s of p.steps) {
+    const sk = SKILLS[s.skill], kv = [];
+    for (const [k, spec] of Object.entries(sk.params)) {
+      const v = s.params[k];
+      if (k === 'recover' || k === 'retries' || v === undefined || v === '' || v === null || v === spec.d) continue;
+      kv.push(`${k}=${pyv(spec.t === 'num' ? +v : v)}`);
+    }
+    const note = [val(s, 'spec') ? '§' + val(s, 'spec') : '', val(s, 'label') || ''].filter(Boolean).join(' ');
+    L.push(`    w.${s.skill}(${kv.join(', ')})${note ? '   # ' + note : ''}`);
+  }
+  if (!p.steps.length) L.push('    pass');
+  L.push('', '', 'if __name__ == "__main__":', '    main_for(procedure)');
+  return L.join('\n') + '\n';
+}
+
+// ---------- rendering ----------
+const $ = q => document.querySelector(q);
+let A = analyze(proc());
+
+function edited(opts = {}) {
+  const p = proc();
+  if (ui.sim) stopSim(true);
+  if (p.status !== 'draft') { p.status = 'draft'; p.simLog = null; delete p.approvedBy; toast('Edited, so this procedure is back to draft. Dry-run it again before sign-off.'); }
+  ui.signoff = false;
+  save();
+  A = analyze(p);
+  renderScript(); renderHeader(); renderStage(false);
+  if (opts.panel || ui.tab !== 'block') renderPanel(); else renderIssuesOnly();
+}
+
+function render() {
+  A = analyze(proc());
+  renderHeader(); renderShelf(); renderScript(); renderStage(false); renderPanel();
+}
+
+const STAGES = [['draft', 'Draft'], ['sim', 'Sim passed'], ['approved', 'Approved for arm']];
+function renderHeader() {
+  const p = proc(), idx = STAGES.findIndex(x => x[0] === p.status);
+  if (document.activeElement !== $('#procName')) $('#procName').value = p.name;
+  $('#procPick').innerHTML = S.procs.map(q => `<option value="${q.id}"${q.id === p.id ? ' selected' : ''}>${esc(q.name)}</option>`).join('');
+  $('#delWrap').innerHTML = ui.confirmDel
+    ? `<span class="confirm">Delete ${esc(p.name)}? <button class="btn small" id="delYes" type="button">Delete</button><button class="btn small ghost" id="delNo" type="button">Keep</button></span>`
+    : `<button class="btn small ghost" id="delProc" type="button"${S.procs.length < 2 ? ' disabled' : ''}>Delete</button>`;
+  $('#life').innerHTML = STAGES.map(([k, l], j) => `<span class="stage${j < idx ? ' done' : j === idx ? ' now' : ''}"><span class="dot"></span>${l}</span>`).join('');
+}
+
+function renderShelf() {
+  if (!$('#shelf').childElementCount) {
+    $('#shelf').innerHTML = GROUPS.map(([g, name]) => `<div style="margin-bottom:14px"><h2><i style="--c:var(--b-${g})"></i>${name}</h2><div class="group">${
+      Object.entries(SKILLS).filter(([, s]) => s.group === g).map(([k]) => shelfBlockHTML(k)).join('')}</div></div>`).join('');
+  }
+  $('#stationList').innerHTML = stations().filter(s => s.name !== 'home').map(s => `<div class="st"><span>${esc(s.name)}</span><span class="meta">${
+    s.tag ? `tag ${s.tag}` : 'no tag'}${s.custom ? ` <button class="btn small ghost" type="button" data-delst="${esc(s.name)}" aria-label="Remove ${esc(s.name)}">Remove</button>` : ''}</span></div>`).join('');
+}
+
+let restoring = false;
+function renderScript() {
+  const p = proc();
+  // keep the caret where it was if the person is typing in a block's slot
+  const a = document.activeElement;
+  const keep = a && a.dataset && a.dataset.k && a.closest('#stack .blk')
+    ? { id: a.closest('.blk').dataset.id, k: a.dataset.k, v: a.value, ss: a.selectionStart, se: a.selectionEnd } : null;
+  const startTxt = (p.start || []).length ? p.start.map(o => `<span class="in">${esc(o.item)} on ${esc(o.at)}</span>`).join(' ') : '<span class="in">empty bench</span>';
+  $('#hat').innerHTML = `<div class="blk hat${ui.sel === 'start' ? ' sel' : ''}" data-hat="1" tabindex="0" role="button" aria-label="Starting layout. Click to edit."><span class="n"></span><div class="shape">when the run starts with ${startTxt}</div></div>`;
+  $('#stack').innerHTML = p.steps.map((s, i) => blockHTML(s, i, A.steps[i])).join('');
+  $('#endhint').innerHTML = p.steps.length ? '' : '<b>Drag a block under the yellow one to start.</b> Try Pick up, then Place, then Go home.';
+  $('#totals').innerHTML = `<span><b>${p.steps.length}</b> blocks</span><span>Arm time about <b>${fmtS(A.total)}</b></span><span><b>${A.operators}</b> operator pauses</span>${
+    A.errors ? `<span style="color:var(--fault)"><b style="color:inherit">${A.errors}</b> problem${A.errors > 1 ? 's' : ''} to fix</span>` : '<span style="color:var(--ok)">No problems</span>'}`;
+  markSelection(); markRun();
+  if (keep) {
+    const n = document.querySelector(`#stack .blk[data-id="${keep.id}"] [data-k="${keep.k}"]`);
+    if (n) {
+      if (n.tagName === 'INPUT') { n.value = keep.v; fitSlot(n); }
+      restoring = true; n.focus({ preventScroll: true }); restoring = false;
+      if (n.tagName === 'INPUT' && keep.ss !== null) try { n.setSelectionRange(keep.ss, keep.se); } catch (e) {}
+    }
+  }
+}
+function markSelection() {
+  document.querySelectorAll('#stack .blk').forEach(b => b.classList.toggle('sel', b.dataset.id === ui.sel));
+  const h = $('#hat .blk'); if (h) h.classList.toggle('sel', ui.sel === 'start');
+}
+function markRun() {
+  const blocks = document.querySelectorAll('#stack .blk');
+  blocks.forEach((b, i) => { b.classList.toggle('running', !!ui.sim && ui.sim.i === i); b.classList.toggle('ran', !!ui.sim && ui.sim.i > i); });
+}
+
+// ---------- stage: bench plan + run controls ----------
+const FLAG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 2v17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 3c3-1.6 5 1.6 9 0v8c-4 1.6-6-1.6-9 0z" fill="#3fb04c" stroke="#2a7f33" stroke-width="1"/></svg>';
+const STOP = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 1.5h7l5 5v7l-5 5h-7l-5-5v-7z" fill="#e5533d" stroke="#b33a27" stroke-width="1"/></svg>';
+function renderStage(animate) {
+  const p = proc();
+  $('#stagebar').innerHTML = `<button class="btn flag" type="button" id="runSim"${p.steps.length && !ui.sim ? '' : ' disabled'}>${FLAG}Dry run</button>
+    <button class="btn iconbtn" type="button" id="stopSim" aria-label="Stop dry run"${ui.sim ? '' : ' disabled'}>${STOP}</button>
+    <span class="spacer"></span>
+    <button class="btn small" type="button" id="approve"${p.status === 'sim' && !ui.sim ? '' : ' disabled'}>Sign off</button>
+    <button class="btn small" type="button" disabled title="No arm is connected in this build">Run on arm</button>`;
+  $('#signoffBox').innerHTML = ui.signoff ? `<form class="signoff" id="signoffForm">
+      <span>Signing off means this procedure may run on the real arm. Any later edit sends it back to draft.</span>
+      <div class="row"><label class="sr" for="signName">Your name</label><input id="signName" type="text" placeholder="Your name" autocomplete="name">
+      <button class="btn primary small" type="submit">Sign off</button><button class="btn ghost small" type="button" id="signCancel">Cancel</button></div></form>` : '';
+  drawPlan(animate);
+}
+function armPose(target) {
+  const dx = target.x - BASE.x, dy = target.y - BASE.y;
+  return { a: Math.atan2(dy, dx), d: Math.max(30, Math.min(L1 + L2 - 4, Math.hypot(dx, dy))) };
+}
+function armPath(a, d) {
+  const phi = Math.acos(Math.min(1, d / (L1 + L2)));
+  return { e: { x: BASE.x + L1 * Math.cos(a + phi), y: BASE.y + L1 * Math.sin(a + phi) }, t: { x: BASE.x + d * Math.cos(a), y: BASE.y + d * Math.sin(a) } };
+}
+function drawPlan(animate) {
+  const p = proc();
+  const i = ui.sim ? ui.sim.i : p.steps.findIndex(s => s.id === ui.sel);
+  const st8 = i >= 0 && A.steps[i] ? A.steps[i].after : A.start, s = i >= 0 ? p.steps[i] : null;
+  const hot = s && val(s, 'station');
+  let svg = `<path class="svg-reach" d="M ${BASE.x - L1 - L2} ${BASE.y} A ${L1 + L2} ${L1 + L2} 0 0 1 ${BASE.x + L1 + L2} ${BASE.y}"/>
+    <text class="svg-note" x="${BASE.x + L1 + L2 - 14}" y="${BASE.y + 14}" text-anchor="end">FR3 reach</text>`;
+  for (const x of stations()) {
+    if (x.name === 'home') { svg += `<circle cx="${x.x}" cy="${x.y}" r="5" class="svg-reach" style="stroke-dasharray:2 2"/><text class="svg-label${s && s.skill === 'home' ? ' hot' : ''}" x="${x.x + 8}" y="${x.y + 3}">home</text>`; continue; }
+    const isHot = (hot === x.name && !(s && s.skill === 'shake')) || (s && s.skill === 'shake' && x.name === 'shake');
+    svg += `<rect class="svg-st${isHot ? (s.skill === 'verify' ? ' checking' : ' hot') : ''}" x="${x.x - SW / 2}" y="${x.y - SH / 2}" width="${SW}" height="${SH}" rx="${x.name === 'hotplate' ? 3 : 5}"/>`;
+    if (x.name === 'hotplate') svg += `<circle cx="${x.x}" cy="${x.y}" r="10" fill="none" stroke="var(--muted)" stroke-width="1"/><circle cx="${x.x}" cy="${x.y}" r="5" fill="none" stroke="var(--muted)" stroke-width="1"/>`;
+    if (x.tag) svg += `<rect class="svg-tag" x="${x.x + 13}" y="${x.y - 13}" width="10" height="9"/><text class="svg-tagid" x="${x.x + 18}" y="${x.y - 6.4}" text-anchor="middle">${x.tag}</text>`;
+    svg += `<text class="svg-label${isHot ? ' hot' : ''}" x="${x.x}" y="${x.y + 26}" text-anchor="middle">${esc(x.name)}</text>`;
+  }
+  const flask = (cx, cy, it, held) => `<circle class="svg-flask${st8.contents && st8.contents[it] === 'iodine' ? ' iodine' : ''}${held ? ' held' : ''}" cx="${cx}" cy="${cy}" r="9"/><circle class="svg-neck" cx="${cx}" cy="${cy}" r="3.2"/>`;
+  const placed = {};
+  for (const [it, where] of Object.entries(st8.where)) {
+    const x = st(where); if (!x) continue;
+    const n = placed[where] = (placed[where] || 0) + 1;
+    svg += flask(x.x - 5 + (n - 1) * 14, x.y + 2, it, false);
+  }
+  const goal = armPose(st(st8.armAt) || st('home'));
+  const from = ui.armA || goal;
+  svg += `<g id="armG"></g><circle class="svg-base" cx="${BASE.x}" cy="${BASE.y}" r="13"/>`;
+  $('#plan').innerHTML = svg;
+  const g = $('#armG');
+  const paint = (a, d) => {
+    const { e, t } = armPath(a, d);
+    g.innerHTML = `<path class="svg-arm" d="M ${BASE.x} ${BASE.y} L ${e.x} ${e.y} L ${t.x} ${t.y}"/><circle class="svg-joint" cx="${e.x}" cy="${e.y}" r="4"/>` +
+      (st8.holding ? flask(t.x, t.y, st8.holding, true) + `<text class="svg-item" x="${t.x + 13}" y="${t.y - 9}">${esc(st8.holding)}</text>` : `<circle class="svg-joint" cx="${t.x}" cy="${t.y}" r="5"/>`);
+  };
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  cancelAnimationFrame(ui.raf);
+  if (animate && !reduce) {
+    const t0 = performance.now(), dur = 420;
+    let da = goal.a - from.a; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
+    const tick = now => {
+      const k = Math.min(1, (now - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      const a = from.a + da * e, d = from.d + (goal.d - from.d) * e;
+      ui.armA = { a, d }; paint(a, d);
+      if (k < 1) ui.raf = requestAnimationFrame(tick);
+    };
+    paint(from.a, from.d);
+    ui.raf = requestAnimationFrame(tick);
+  } else { ui.armA = goal; paint(goal.a, goal.d); }
+  const items = Object.entries(st8.where).map(([k, v]) => `${esc(k)} on ${esc(v)}`);
+  const label = ui.sim && s ? `<b>Dry run, step ${i + 1} of ${p.steps.length}:</b> ${esc(summary(s, A.steps[i]))}. ` : i >= 0 ? `<b>After step ${i + 1}.</b> ` : '<b>Starting layout.</b> ';
+  $('#planCap').innerHTML = label + (st8.holding ? `Gripper holds ${esc(st8.holding)}${st8.contents[st8.holding] === 'iodine' ? ' (iodine added)' : ''}. ` : 'Gripper is empty. ') +
+    (items.length ? items.join(', ') + '.' : 'Nothing else on the bench.');
+}
+
+// ---------- right panel ----------
+function field(s, k, spec) {
+  const fid = `f-${k}`, v = s.params[k] ?? (spec.d ?? '');
+  const cls = spec.wide ? ' class="wide"' : '';
+  if (spec.t === 'bool') return `<label class="check wide" for="${fid}"><input id="${fid}" type="checkbox" data-k="${k}"${val(s, k) ? ' checked' : ''}> ${spec.label}</label>`;
+  if (spec.t === 'station') return `<label for="${fid}" class="wide">${spec.label}<select id="${fid}" data-k="${k}"><option value="">Choose a station</option>${
+    stations().filter(x => x.name !== 'home').map(x => `<option value="${esc(x.name)}"${x.name === v ? ' selected' : ''}>${esc(x.name)}, ${esc(x.description)}</option>`).join('')}</select></label>`;
+  if (spec.t === 'pose') { const sx = st(val(s, 'station')); return `<label for="${fid}">${spec.label}<select id="${fid}" data-k="${k}">${
+    (sx ? sx.poses : ['above']).map(x => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select></label>`; }
+  if (spec.t === 'num') return `<label for="${fid}"${cls}>${spec.label}<input id="${fid}" type="number" data-k="${k}" value="${esc(v)}"${spec.min !== undefined ? ` min="${spec.min}"` : ''}${spec.max !== undefined ? ` max="${spec.max}"` : ''} step="${spec.step || 'any'}"></label>`;
+  return `<label for="${fid}"${cls}>${spec.label}<input id="${fid}" type="text" data-k="${k}" value="${esc(v)}" placeholder="${esc(spec.ph || '')}" autocomplete="off"></label>`;
+}
+function timedBar(s) {
+  const sec = +val(s, 'seconds') || 0, tol = +val(s, 'tolerance_s') || 0, max = Math.max(60, Math.ceil((sec + tol) / 30) * 30);
+  const pct = x => Math.max(0, Math.min(100, x / max * 100));
+  return `<div><div class="tbar" aria-hidden="true"><div class="fill" style="width:${pct(sec)}%"></div>${tol ? `<div class="tol" style="left:${pct(sec - tol)}%;width:${pct(2 * tol)}%"></div>` : ''}</div>
+    <div class="tscale" aria-hidden="true"><span>0 s</span><span>${max} s</span></div></div>`;
+}
+function issuesHTML(i) {
+  const r = A.steps[i]; if (!r) return '';
+  const tags = [];
+  if (r.recovery === 'gr00t') tags.push(`<span class="tag gr">GR00T recovery, not trained yet</span>`);
+  if (r.recovery === 'operator') tags.push(`<span class="tag op">Recovery: operator</span>`);
+  if (r.est) tags.push(`<span class="tag">about ${fmtS(r.est)}</span>`);
+  if (proc().steps[i].skill === 'operator') tags.push(`<span class="tag op">Waits for a person</span>`);
+  return `<div class="muted small">${esc(summary(proc().steps[i], r))}</div>${tags.length ? `<div class="tagrow">${tags.join('')}</div>` : ''}${
+    r.issues.map(x => `<div class="issue ${x.level}">${x.level === 'error' ? 'Problem:' : x.level === 'warn' ? 'Heads up:' : 'Note:'} ${esc(x.msg)}</div>`).join('')}`;
+}
+function renderIssuesOnly() {
+  const box = $('#edIssues'), p = proc(), i = p.steps.findIndex(s => s.id === ui.sel);
+  if (box && i >= 0) box.innerHTML = issuesHTML(i);
+  const tb = $('#edTimed'); if (tb && i >= 0) tb.innerHTML = timedBar(p.steps[i]);
+}
+function blockPanel(p) {
+  if (ui.sel === 'start') {
+    const opts = stations().filter(s => s.poses.includes('grasp')).map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+    return `<div class="edhead"><span class="sw" style="--c:var(--b-hat)"></span><h3>Starting layout</h3></div>
+      <p class="muted small" style="margin:0">What is on the bench before the first block runs. The checks track each item from here.</p>
+      <div class="tagrow">${(p.start || []).map((o, i) => `<span class="chip">${esc(o.item)} on ${esc(o.at)}<button type="button" data-unstart="${i}" aria-label="Remove ${esc(o.item)}">×</button></span>`).join('') || '<span class="muted small">The bench is empty.</span>'}</div>
+      <form class="startadd" id="startAdd"><label class="sr" for="startItem">Item</label><input id="startItem" type="text" placeholder="flask_2" autocomplete="off">
+        <label class="sr" for="startAt">Station</label><select id="startAt">${opts}</select><button class="btn small" type="submit">Put on bench</button></form>`;
+  }
+  const i = p.steps.findIndex(s => s.id === ui.sel);
+  if (i < 0) return `<p class="muted" style="margin:0">Type straight into the white boxes and pick from the dropdowns on each block. Click a block to see all of its settings here, including the ones that don't fit on the block. Click the yellow block to change what is on the bench at the start.</p>`;
+  const s = p.steps[i], sk = SKILLS[s.skill];
+  return `<div class="edhead"><span class="sw" style="--c:var(--b-${sk.group})"></span><h3>Step ${i + 1}: ${esc(sk.label)}</h3></div>
+    <div id="edIssues" style="display:grid;gap:6px">${issuesHTML(i)}</div>
+    ${sk.timed ? `<div id="edTimed">${timedBar(s)}</div>` : ''}
+    <div class="form">${Object.entries(sk.params).map(([k, spec]) => field(s, k, spec)).join('')}${Object.entries(COMMON).map(([k, spec]) => field(s, k, spec)).join('')}</div>
+    <p class="muted small" style="margin:0">${esc(sk.help)} Python: <code>w.${s.skill}()</code></p>
+    <div class="tagrow"><button class="btn small" type="button" id="dupStep">Duplicate</button><button class="btn small" type="button" id="delStep">Delete block</button></div>`;
+}
+function checksPanel(p) {
+  const all = [];
+  A.steps.forEach((r, i) => r.issues.forEach(x => x.level !== 'info' && all.push({ ...x, i })));
+  A.end.forEach(x => all.push({ ...x, i: -1 }));
+  const errs = all.filter(x => x.level === 'error').length;
+  const rec = p.steps.map((s, i) => ({ s, i, r: A.steps[i] })).filter(x => x.r.recovery);
+  const timed = p.steps.map((s, i) => ({ s, i })).filter(x => SKILLS[x.s.skill].timed && +val(x.s, 'tolerance_s') > 0);
+  return `<div class="verdict ${errs ? 'bad' : 'ok'}">${errs ? `${errs} problem${errs > 1 ? 's' : ''} block the dry run` : 'No problems found. Ready for a dry run.'}</div>
+    ${all.length ? `<ul class="ilist">${all.map(x => `<li class="issue ${x.level}">${x.i >= 0 ? `<button type="button" data-jump="${x.i}"><span class="go">Step ${x.i + 1}</span>${esc(x.msg)}</button>` : esc(x.msg)}</li>`).join('')}</ul>` : ''}
+    <div><h3>Who fixes a failed placement check</h3>${rec.length ? `<div class="tablewrap"><table><thead><tr><th>Step</th><th>Station</th><th>Recovery</th></tr></thead><tbody>${
+      rec.map(x => `<tr><td>${x.i + 1}</td><td>${esc(val(x.s, 'station'))}</td><td>${x.r.recovery === 'gr00t' ? `<span style="color:var(--violet)">GR00T: ${esc(val(x.s, 'recover'))}</span>` : 'Operator'}</td></tr>`).join('')}</tbody></table></div>
+      <p class="muted small" style="margin:6px 0 0">No GR00T skill is trained yet, so every recovery would go to the operator today.</p>` : '<p class="muted" style="margin:4px 0 0">No blocks check a tagged station.</p>'}</div>
+    <div><h3>Timed D4607 steps</h3>${timed.length ? `<div class="tablewrap"><table><thead><tr><th>Step</th><th>What</th><th>Window</th></tr></thead><tbody>${
+      timed.map(x => `<tr><td>${x.i + 1}</td><td>${esc(val(x.s, 'label') || SKILLS[x.s.skill].label)}</td><td>${val(x.s, 'seconds')} ± ${val(x.s, 'tolerance_s')} s</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted" style="margin:4px 0 0">None. Boil, Shake, and a Wait with a tolerance are timed steps.</p>'}</div>
+    <p class="muted small" style="margin:0">Reachability (planning every move with MoveIt) needs the real backend and is not checked here.</p>`;
+}
+function yamlPanel(p) {
+  return `<p class="muted small" style="margin:0">Save this as a file and run it on the FR3 helpers with <code>python -m walter_fr3.run file.yaml</code> (a dry run unless you add <code>--ip</code>). The ROS 2 runner (<code>ros2 run walter_skills run</code>) reads the same format but only knows the original ten blocks.</p>
+    <div><button class="btn small" type="button" id="copyYaml">Copy YAML</button></div><pre class="yaml" id="yamlText">${esc(toYaml(p))}</pre>`;
+}
+function pyPanel(p) {
+  return `<p class="muted small" style="margin:0">Each block is one call to a helper in <code>controls/fr3_python/walter_fr3/helpers.py</code>. Save this as a <code>.py</code> file next to that folder. It dry-runs with no robot, and drives the FR3 when you add <code>--ip</code>.</p>
+    <div><button class="btn small" type="button" id="copyPy">Copy Python</button></div><pre class="yaml" id="yamlText">${esc(toPython(p))}</pre>`;
+}
+function logPanel(p) {
+  const log = ui.sim ? ui.sim.log : p.simLog;
+  if (!log || !log.length) return `<p class="muted" style="margin:0">No dry run yet. Press Dry run to watch the procedure play out on the bench above. Timings are the planned values, since nothing really moves.</p>`;
+  return `${p.status === 'approved' ? `<p style="margin:0">Signed off by <b>${esc(p.approvedBy)}</b> on ${esc(p.approvedAt)}.</p>` : ''}
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Step</th><th>Start</th><th>Took</th><th>Result</th></tr></thead><tbody>${
+    log.map(e => `<tr><td>${e.n}</td><td>${esc(e.what)}</td><td>${fmtS(e.t)}</td><td>${e.op ? 'operator' : fmtS(e.dur)}</td><td>${
+      e.tol ? `<span class="pass">within ± ${e.tol} s</span>` : '<span class="pass">done</span>'}</td></tr>`).join('')}</tbody></table></div>
+    ${!ui.sim ? `<div><button class="btn small" type="button" id="copyLog">Copy log as JSON lines</button></div>` : ''}`;
+}
+function renderPanel() {
+  const p = proc();
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.id === 'tab-' + ui.tab));
+  $('#panel').setAttribute('aria-labelledby', 'tab-' + ui.tab);
+  $('#panel').innerHTML = ui.tab === 'block' ? blockPanel(p) : ui.tab === 'checks' ? checksPanel(p) : ui.tab === 'yaml' ? yamlPanel(p) : ui.tab === 'py' ? pyPanel(p) : logPanel(p);
+}
+function select(sel) {
+  ui.sel = sel; ui.tab = 'block';
+  markSelection(); renderPanel(); if (!ui.sim) drawPlan(true);
+}
+
+// ---------- dry run: highlights blocks in place and never scrolls the page ----------
+function runSim() {
+  const p = proc();
+  if (A.errors) {
+    const i = A.steps.findIndex(r => r.level === 'error');
+    ui.tab = 'checks'; if (i >= 0) ui.sel = p.steps[i].id;
+    markSelection(); renderPanel();
+    toast(`Fix the ${A.errors} problem${A.errors > 1 ? 's' : ''} first.${i >= 0 ? ` Step ${i + 1} is the first one.` : ''}`);
+    return;
+  }
+  ui.sim = { i: -1, log: [], t: 0 }; ui.tab = 'log'; ui.armA = ui.armA || armPose(st('home'));
+  const next = () => {
+    if (!ui.sim) return;
+    const sim = ui.sim; sim.i++;
+    if (sim.i >= p.steps.length) {
+      p.simLog = sim.log; p.status = 'sim'; ui.sim = null; save();
+      markRun(); renderHeader(); renderStage(false); renderPanel();
+      toast('Dry run passed. Sign off when you are ready for the arm.'); return;
+    }
+    const s = p.steps[sim.i], r = A.steps[sim.i];
+    sim.log.push({ n: sim.i + 1, what: summary(s, r), skill: s.skill, t: sim.t, dur: r.est, op: ['operator', 'record'].includes(s.skill),
+                   tol: SKILLS[s.skill].timed && +val(s, 'tolerance_s') ? +val(s, 'tolerance_s') : 0 });
+    sim.t += r.est;
+    markRun(); drawPlan(true);
+    if (ui.tab === 'log') { const pn = $('#panel'), atEnd = pn.scrollTop + pn.clientHeight >= pn.scrollHeight - 4; renderPanel(); if (atEnd) pn.scrollTop = pn.scrollHeight; }
+    sim.timer = setTimeout(next, ['operator', 'record'].includes(s.skill) ? 700 : Math.min(1600, 500 + r.est * 40));
+  };
+  renderStage(false); renderPanel(); next();
+}
+function stopSim(silent) {
+  if (!ui.sim) return;
+  clearTimeout(ui.sim.timer); ui.sim = null;
+  markRun(); renderStage(false); renderPanel();
+  if (!silent) toast('Dry run stopped. The procedure stays in draft.');
+}
+
+// ---------- toast ----------
+let toastT;
+function toast(msg, action) {
+  const t = $('#toast');
+  t.innerHTML = `<span>${esc(msg)}</span>${action ? `<button type="button" id="toastAct">${esc(action.label)}</button>` : ''}`;
+  t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, action ? 6000 : 4200);
+  if (action) $('#toastAct').onclick = () => { t.hidden = true; action.run(); };
+}
+
+// ---------- editing helpers ----------
+function insertStep(skill, index) {
+  const p = proc(), s = step(skill, {});
+  const lastAt = (() => { const r = index > 0 ? A.steps[index - 1] : null; return r ? r.after : A.start; })();
+  if (skill === 'pick') { const w = Object.values(lastAt.where); if (w.length) s.params.station = w[0]; }
+  p.steps.splice(index, 0, s); ui.sel = s.id; ui.tab = 'block';
+  edited({ panel: true });
+}
+function removeStep(index) {
+  const p = proc(), [s] = p.steps.splice(index, 1);
+  if (ui.sel === s.id) ui.sel = null;
+  edited({ panel: true });
+  toast(`Deleted step ${index + 1}, ${SKILLS[s.skill].label}.`, { label: 'Undo', run: () => { proc().steps.splice(index, 0, s); ui.sel = s.id; edited({ panel: true }); } });
+}
+function moveStep(from, to) {
+  const p = proc(); if (to < 0 || to >= p.steps.length || from === to) return;
+  const [m] = p.steps.splice(from, 1); p.steps.splice(to, 0, m); ui.sel = m.id; edited({ panel: true });
+}
+
+// ---------- pointer drag and drop (mouse, pen and touch) ----------
+const canvas = $('#canvas'), stackEl = $('#stack'), work = $('#work');
+let drag = null;
+function startDrag(e, el) {
+  const isNew = !!el.dataset.skill;
+  if (ui.sim) stopSim(true);
+  const shape = el.querySelector('.shape').getBoundingClientRect();
+  const ghost = el.cloneNode(true); ghost.classList.add('dragghost'); ghost.classList.remove('sel', 'running', 'ran'); ghost.removeAttribute('tabindex');
+  document.body.appendChild(ghost);
+  drag.ghost = ghost; drag.dx = e.clientX - shape.left; drag.dy = e.clientY - shape.top; drag.started = true;
+  drag.h = shape.height;
+  drag.ph = document.createElement('div'); drag.ph.className = 'ph';
+  drag.ph.style.height = drag.h + 'px'; drag.ph.style.width = Math.min(shape.width, 360) + 'px';
+  if (!isNew) { drag.from = proc().steps.findIndex(s => s.id === el.dataset.id); el.classList.add('lifted'); }
+  moveDrag(e);
+}
+function overCanvas(e) {
+  const r = canvas.getBoundingClientRect();
+  return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+}
+function moveDrag(e) {
+  drag.ghost.style.left = (e.clientX - drag.dx) + 'px';
+  drag.ghost.style.top = (e.clientY - drag.dy) + 'px';
+  const blocks = [...stackEl.querySelectorAll('.blk:not(.lifted)')];
+  if (overCanvas(e)) {
+    let idx = blocks.length;
+    for (let k = 0; k < blocks.length; k++) { const b = blocks[k].getBoundingClientRect(); if (e.clientY - drag.dy + drag.h / 2 < b.top + b.height / 2) { idx = k; break; } }
+    drag.to = idx;
+    const ref = blocks[idx] || null;
+    if (drag.ph.nextSibling !== ref || drag.ph.parentNode !== stackEl) stackEl.insertBefore(drag.ph, ref);
+    canvas.classList.add('over'); work.classList.remove('trash');
+  } else {
+    drag.to = null; drag.ph.remove(); canvas.classList.remove('over');
+    work.classList.toggle('trash', drag.from !== undefined);
+  }
+  // keep the script scrolling when dragging near its edges
+  const cr = canvas.getBoundingClientRect();
+  if (overCanvas(e)) { if (e.clientY < cr.top + 40) canvas.scrollTop -= 12; else if (e.clientY > cr.bottom - 40) canvas.scrollTop += 12; }
+}
+function endDrag() {
+  const d = drag; drag = null;
+  d.ghost.remove(); d.ph.remove(); canvas.classList.remove('over'); work.classList.remove('trash');
+  const lifted = document.querySelector('.blk.lifted'); if (lifted) lifted.classList.remove('lifted');
+  if (d.el.dataset.skill) { if (d.to !== null && d.to !== undefined) insertStep(d.el.dataset.skill, d.to); return; }
+  if (d.to === null || d.to === undefined) { removeStep(d.from); return; }
+  moveStep(d.from, d.to);
+}
+document.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  if (e.target.closest('#stack input, #stack select')) return;  // let the slot take the click
+  const el = e.target.closest('.shelf .blk, #stack .blk'); if (!el) return;
+  drag = { el, x: e.clientX, y: e.clientY, started: false, pid: e.pointerId };
+  e.preventDefault();
+});
+document.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.pid) return;
+  if (!drag.started) { if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return; startDrag(e, drag.el); return; }
+  moveDrag(e);
+});
+document.addEventListener('pointerup', e => {
+  if (!drag || e.pointerId !== drag.pid) return;
+  if (drag.started) return endDrag();
+  const el = drag.el; drag = null;
+  if (el.dataset.skill) { toast('Drag the block into the script to add it.'); return; }
+  el.focus({ preventScroll: true }); select(el.dataset.id);
+});
+document.addEventListener('pointercancel', () => {
+  if (drag && drag.started) { drag.to = drag.el.dataset.skill ? null : drag.from; endDrag(); }
+  drag = null;
+});
+
+// keyboard equivalents
+$('#shelf').addEventListener('keydown', e => {
+  const el = e.target.closest('.blk'); if (!el || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault(); const p = proc(), i = p.steps.findIndex(s => s.id === ui.sel);
+  insertStep(el.dataset.skill, i >= 0 ? i + 1 : p.steps.length);
+});
+// editing a block's own slots
+function onSlot(e) {
+  const el = e.target, k = el.dataset.k; if (!k) return;
+  const b = el.closest('.blk'), p = proc(), s = b && p.steps.find(x => x.id === b.dataset.id); if (!s) return;
+  const spec = SKILLS[s.skill].params[k] || COMMON[k];
+  let v = el.value;
+  if (spec.t === 'num' && v.trim() !== '' && !isNaN(+v)) v = +v;
+  s.params[k] = v;
+  if (k === 'station' && s.skill === 'move_to') { const sx = st(v); if (sx && !sx.poses.includes(val(s, 'pose'))) s.params.pose = sx.poses[0]; }
+  ui.sel = s.id;
+  if (el.tagName === 'INPUT') fitSlot(el);
+  edited({ panel: true });
+}
+stackEl.addEventListener('input', e => { if (e.target.tagName === 'INPUT') onSlot(e); });
+stackEl.addEventListener('change', e => { if (e.target.tagName === 'SELECT') onSlot(e); });
+stackEl.addEventListener('focusin', e => {
+  const b = e.target.closest('.blk');
+  if (!restoring && b && e.target.dataset.k && ui.sel !== b.dataset.id) select(b.dataset.id);
+});
+stackEl.addEventListener('keydown', e => {
+  if (e.target.closest('input, select')) { if (e.key === 'Enter' || e.key === 'Escape') e.target.blur(); return; }
+  const el = e.target.closest('.blk'); if (!el) return;
+  const i = proc().steps.findIndex(s => s.id === el.dataset.id);
+  const refocus = () => { const b = stackEl.querySelector(`[data-id="${ui.sel}"]`); if (b) b.focus(); };
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(el.dataset.id); }
+  else if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); moveStep(i, i - 1); refocus(); }
+  else if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); moveStep(i, i + 1); refocus(); }
+  else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeStep(i); }
+});
+$('#hat').addEventListener('click', () => select('start'));
+$('#hat').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select('start'); } });
+
+// ---------- panel events ----------
+function onField(e) {
+  const k = e.target.dataset.k; if (!k) return;
+  const p = proc(), s = p.steps.find(x => x.id === ui.sel); if (!s) return;
+  const spec = SKILLS[s.skill].params[k] || COMMON[k];
+  let v = spec.t === 'bool' ? e.target.checked : e.target.value;
+  if (spec.t === 'num' && v !== '') v = +v;
+  s.params[k] = v;
+  let full = false;
+  if (k === 'station' && s.skill === 'move_to') { const sx = st(v); if (sx && !sx.poses.includes(val(s, 'pose'))) s.params.pose = sx.poses[0]; full = true; }
+  edited({ panel: full });
+  if (full) { const f = document.getElementById('f-' + k); if (f) f.focus(); }
+}
+$('#panel').addEventListener('input', e => { if (e.target.type === 'text' || e.target.type === 'number') onField(e); });
+$('#panel').addEventListener('change', e => { if ((e.target.tagName === 'SELECT' && e.target.dataset.k) || e.target.type === 'checkbox') onField(e); });
+$('#panel').addEventListener('click', e => {
+  const p = proc(), t = e.target;
+  const j = t.closest('[data-jump]');
+  if (j) { const s = p.steps[+j.dataset.jump]; select(s.id); const b = stackEl.querySelector(`[data-id="${s.id}"]`); if (b) b.scrollIntoView({ block: 'nearest' }); return; }
+  const un = t.closest('[data-unstart]');
+  if (un) { p.start.splice(+un.dataset.unstart, 1); edited({ panel: true }); return; }
+  if (t.id === 'dupStep') { const i = p.steps.findIndex(s => s.id === ui.sel), c = { id: id(), skill: p.steps[i].skill, params: { ...p.steps[i].params } }; p.steps.splice(i + 1, 0, c); ui.sel = c.id; edited({ panel: true }); }
+  if (t.id === 'delStep') removeStep(p.steps.findIndex(s => s.id === ui.sel));
+  if (t.id === 'copyYaml') copy(toYaml(p), 'the YAML');
+  if (t.id === 'copyPy') copy(toPython(p), 'the Python');
+  if (t.id === 'copyLog') copy(p.simLog.map(x => JSON.stringify({ step: x.n, skill: x.skill, t_s: x.t, duration_s: x.dur, within_tolerance: x.tol ? true : undefined, simulated: true })).join('\n'), 'the run log');
+});
+$('#panel').addEventListener('submit', e => {
+  if (e.target.id !== 'startAdd') return;
+  e.preventDefault(); const p = proc();
+  const item = $('#startItem').value.trim().replace(/\s+/g, '_'), at = $('#startAt').value;
+  if (!item) { toast('Name the item first, like flask_2 or beaker_1.'); $('#startItem').focus(); return; }
+  if (p.start.some(o => o.item === item)) { toast(`${item} is already on the bench.`); return; }
+  if (p.start.some(o => o.at === at)) { toast(`${at} already has ${p.start.find(o => o.at === at).item} on it.`); return; }
+  p.start.push({ item, at }); edited({ panel: true }); $('#startItem').focus();
+});
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { ui.tab = b.id.slice(4); renderPanel(); } });
+document.querySelector('.tabs').addEventListener('keydown', e => {
+  if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+  const order = ['block', 'checks', 'py', 'yaml', 'log'], j = (order.indexOf(ui.tab) + (e.key === 'ArrowRight' ? 1 : 4)) % 5;
+  ui.tab = order[j]; renderPanel(); $('#tab-' + ui.tab).focus();
+});
+async function copy(text, label) {
+  try { await navigator.clipboard.writeText(text); toast(`Copied ${label}.`); }
+  catch (err) { const pre = $('#yamlText'); if (pre) { const r = document.createRange(); r.selectNodeContents(pre); getSelection().removeAllRanges(); getSelection().addRange(r); } toast('Copy is blocked here. Select the text and press Ctrl+C or Cmd+C.'); }
+}
+
+// stage
+$('#stagebar').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'runSim') runSim();
+  if (b.id === 'stopSim') stopSim();
+  if (b.id === 'approve') { ui.signoff = true; renderStage(false); $('#signName').focus(); }
+});
+$('#signoffBox').addEventListener('click', e => { if (e.target.id === 'signCancel') { ui.signoff = false; renderStage(false); } });
+$('#signoffBox').addEventListener('submit', e => {
+  e.preventDefault(); const name = $('#signName').value.trim();
+  if (!name) { toast('Add your name to sign off.'); return; }
+  const p = proc(); p.status = 'approved'; p.approvedBy = name; p.approvedAt = new Date().toISOString().slice(0, 10);
+  ui.signoff = false; save(); renderHeader(); renderStage(false); renderPanel(); toast(`Signed off. ${p.name} is approved for the arm once the arm is connected.`);
+});
+
+// stations
+$('#toggleAddSt').addEventListener('click', () => { $('#addSt').hidden = false; $('#toggleAddSt').hidden = true; $('#stName').focus(); });
+$('#cancelSt').addEventListener('click', () => { $('#addSt').hidden = true; $('#toggleAddSt').hidden = false; });
+$('#addSt').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('#stName').value.trim().toLowerCase().replace(/\s+/g, '_');
+  if (!/^[a-z][a-z0-9_]{0,31}$/.test(name)) { toast('Station names use lowercase letters, digits and underscores, like counter or rack_2.'); return; }
+  if (st(name)) { toast(`There is already a station called ${name}.`); return; }
+  const used = stations().map(s => s.tag).filter(Boolean);
+  S.custom.push({ name, description: $('#stDesc').value.trim() || name, tag: $('#stTag').checked ? Math.max(4, ...used) + 1 : null, poses: ['above', 'grasp'], custom: true });
+  $('#stName').value = ''; $('#stDesc').value = ''; $('#stTag').checked = false;
+  $('#addSt').hidden = true; $('#toggleAddSt').hidden = false;
+  save(); render(); toast(`Added ${name}. Its poses are placeholders until someone teaches them on the arm.`);
+});
+$('#stationList').addEventListener('click', e => {
+  const b = e.target.closest('[data-delst]'); if (!b) return;
+  const name = b.dataset.delst;
+  const users = S.procs.filter(p => p.steps.some(s => s.params.station === name) || p.start.some(o => o.at === name));
+  if (users.length) { toast(`${name} is used by ${users.map(p => p.name).join(', ')}. Remove those blocks first.`); return; }
+  S.custom = S.custom.filter(s => s.name !== name); save(); render();
+});
+
+// procedures
+$('#procName').addEventListener('input', e => { proc().name = e.target.value.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64) || 'untitled'; edited(); });
+$('#procName').addEventListener('blur', () => { $('#procName').value = proc().name; });
+$('#procPick').addEventListener('change', e => { stopSim(true); S.current = e.target.value; ui.sel = null; ui.confirmDel = false; ui.armA = null; save(); render(); });
+$('#newProc').addEventListener('click', () => {
+  stopSim(true); const p = { id: id(), name: 'new_procedure_' + (S.procs.length + 1), status: 'draft', start: [], steps: [] };
+  S.procs.push(p); S.current = p.id; ui.sel = 'start'; save(); render(); $('#procName').focus(); $('#procName').select();
+});
+$('#dupProc').addEventListener('click', () => {
+  stopSim(true); const o = proc();
+  const p = { id: id(), name: o.name + '_copy', status: 'draft', start: o.start.map(x => ({ ...x })), steps: o.steps.map(s => ({ id: id(), skill: s.skill, params: { ...s.params } })) };
+  S.procs.push(p); S.current = p.id; ui.sel = null; save(); render(); toast(`Made ${p.name} as a draft.`);
+});
+$('#delWrap').addEventListener('click', e => {
+  if (e.target.id === 'delProc') { ui.confirmDel = true; renderHeader(); $('#delNo').focus(); }
+  if (e.target.id === 'delNo') { ui.confirmDel = false; renderHeader(); }
+  if (e.target.id === 'delYes') {
+    const name = proc().name; stopSim(true);
+    S.procs = S.procs.filter(p => p.id !== S.current); S.current = S.procs[0].id; ui.confirmDel = false; ui.sel = null;
+    save(); render(); toast(`Deleted ${name}.`);
+  }
+});
+
+render();
+})();
+</script>
+
+</body></html>

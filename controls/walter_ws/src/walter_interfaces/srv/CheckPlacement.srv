@@ -1,0 +1,8 @@
+# Is the equipment at a station where the taught poses expect it? Answered from AprilTags.
+string station
+---
+bool ok
+bool tag_seen
+float64 error_mm    # position error in the bench plane
+float64 error_deg   # yaw error
+string message

@@ -1,0 +1,108 @@
+# The Walter cell for a full three-flask ASTM D4607 run on the FAIRINO FR3.
+#
+# Same format as walter_skills/config/stations_fr3.yaml, extended from one flask to three: three rack
+# slots, three cooling spots, three funnels, and one "filtrate" spot where the operator sets each
+# clean filtrate beaker for the 10.6 swirl. The procedure builder offers the same station names.
+#
+# poses: joint positions [joint_1 .. joint_6] in RADIANS (the helpers convert to degrees for the SDK).
+#        Every value here is a PLACEHOLDER copied or fanned out from stations_fr3.yaml. Teach the real
+#        ones on the FR3 (jog with the WebApp or teach pendant, read the joint angles, convert to rad)
+#        before the arm moves glassware. `python -m walter_fr3.teach` prints the current pose in this format.
+# tag:   AprilTag on the equipment. Without ROS there is no camera check, so `verify` asks the operator
+#        to confirm the station instead unless you pass a checker function to Walter().
+
+gripper:
+  tool_do: 0          # FR3 tool digital output that drives the gripper
+  close_level: 1      # DO level that closes it
+  settle_s: 1.0       # wait after switching
+
+dispenser:
+  do: -1              # control-box DO that triggers an electronic bottle-top dispenser; -1 = operator presses it
+  pulse_s: 0.5
+
+stations:
+  home:
+    description: Safe pose clear of everything
+    poses:
+      home: [-0.3469, -1.7251, 1.3482, -1.1939, -1.5708, 0.0]
+
+  rack_1:
+    description: Flask rack, slot 1
+    tag: 1
+    poses:
+      above: [0.3389, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [0.3501, -1.3100, 1.6614, -1.9222, -1.5708, 0.0]
+  rack_2:
+    description: Flask rack, slot 2
+    tag: 5
+    poses:
+      above: [0.4189, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [0.4301, -1.3100, 1.6614, -1.9222, -1.5708, 0.0]
+  rack_3:
+    description: Flask rack, slot 3
+    tag: 6
+    poses:
+      above: [0.4989, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [0.5101, -1.3100, 1.6614, -1.9222, -1.5708, 0.0]
+
+  hotplate:
+    description: Hot plate in the fume hood
+    tag: 2
+    poses:
+      above: [-0.2611, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [-0.2499, -1.3100, 1.6614, -1.9222, -1.5708, 0.0]
+
+  cool_pad:
+    description: Cooling pad, spot 1
+    tag: 3
+    poses:
+      above: [-0.8611, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [-0.8499, -1.3100, 1.6614, -1.9222, -1.5708, 0.0]
+  cool_pad_2:
+    description: Cooling pad, spot 2
+    tag: 7
+    poses:
+      above: [-0.9411, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [-0.9299, -1.3100, 1.6614, -1.9222, -1.5708, 0.0]
+  cool_pad_3:
+    description: Cooling pad, spot 3
+    tag: 8
+    poses:
+      above: [-1.0211, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [-1.0099, -1.3100, 1.6614, -1.9222, -1.5708, 0.0]
+
+  dispenser:
+    description: Bottle-top iodine dispenser (fixed to the bench)
+    poses:
+      under: [-0.5905, -1.5733, 1.5971, -1.5946, -1.5708, 0.0]
+
+  shake:
+    description: Free space for shaking a stoppered flask
+    poses:
+      start: [-0.6075, -1.6018, 1.2823, -1.2513, -1.5708, 0.0]
+
+  funnel:
+    description: Filter funnel 1 over its receiving beaker
+    tag: 4
+    poses:
+      above: [0.6348, -1.4411, 1.2909, -1.4206, -1.5708, 0.0]
+      pour:  [0.6348, -1.4411, 1.2909, -1.4206, -0.5708, 0.0]   # J5 tilts the flask about 57 deg
+  funnel_2:
+    description: Filter funnel 2 over its receiving beaker
+    tag: 9
+    poses:
+      above: [0.7148, -1.4411, 1.2909, -1.4206, -1.5708, 0.0]
+      pour:  [0.7148, -1.4411, 1.2909, -1.4206, -0.5708, 0.0]
+  funnel_3:
+    description: Filter funnel 3 over its receiving beaker
+    tag: 10
+    poses:
+      above: [0.7948, -1.4411, 1.2909, -1.4206, -1.5708, 0.0]
+      pour:  [0.7948, -1.4411, 1.2909, -1.4206, -0.5708, 0.0]
+
+  filtrate:
+    description: Spot where the operator sets a clean filtrate beaker (10.6)
+    tag: 11
+    poses:
+      above: [-1.1811, -1.4271, 1.4847, -1.6284, -1.5708, 0.0]
+      grasp: [-1.1699, -1.3100, 1.6614, -1.9222, -1.5708, 0.0]

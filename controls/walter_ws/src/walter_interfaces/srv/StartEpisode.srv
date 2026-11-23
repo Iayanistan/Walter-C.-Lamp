@@ -1,0 +1,5 @@
+# Start recording a demonstration. The task is the language instruction GR00T will be trained on.
+string task
+---
+bool success
+string message

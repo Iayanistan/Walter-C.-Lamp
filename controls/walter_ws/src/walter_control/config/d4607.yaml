@@ -1,0 +1,49 @@
+# ASTM D4607 sections 10.4 to 10.5 for ONE flask, as a hybrid of scripted moves and GR00T skills.
+# Repeat (or extend) per flask; 10.5 asks for staggered iodine additions across the three flasks.
+#
+# Pose values are PLACEHOLDERS that are reachable and inside the safety box on the IRB 120.
+# Teach real ones on the cell (jog in RobotStudio/FlexPendant or RViz, then copy /joint_states).
+# Order: [joint_1 .. joint_6] in radians.
+name: d4607_single_flask
+
+poses:
+  home:            [0.0, 0.0, 0.0, 0.0, 1.5708, 0.0]
+  rack_above:      [0.6, 0.35, 0.10, 0.0, 1.12, 0.0]
+  hotplate_above:  [0.0, 0.35, 0.10, 0.0, 1.12, 0.0]
+  cool_above:      [-0.6, 0.35, 0.10, 0.0, 1.12, 0.0]
+  dispenser:       [-0.3, 0.20, 0.25, 0.0, 1.12, 0.0]
+  shake_pose:      [-0.3, 0.10, 0.10, 0.0, 1.37, 0.0]
+  funnel_above:    [0.9, 0.30, 0.0, 0.0, 1.27, 0.0]
+
+steps:
+  - {type: operator, label: setup, spec: "10.3-10.4",
+     prompt: "Flask 1 (carbon + 10.0 mL 5% HCl, stopper loosened) in rack slot 1; hot plate on; funnel and filter paper ready"}
+  - {type: move, label: to_rack, through: [home, rack_above], segment_s: 3.0}
+
+  # Learned: grasping and placing glassware is where the VLA earns its keep.
+  - {type: vla, label: flask_to_hotplate, spec: "10.4",
+     instruction: "pick up the flask from the rack and place it on the hot plate", max_duration: 40}
+  - {type: move, label: clear_hotplate, through: [hotplate_above], segment_s: 1.5}
+  # 10.4: "bring the contents to a boil. Allow to boil gently for 30 +/- 2 s".
+  # Time-to-boil depends on the hot plate; the operator confirms the boil starts, then 30 s runs.
+  - {type: operator, label: boil_started, prompt: "Confirm the flask contents are boiling"}
+  - {type: wait, label: boil, spec: "10.4", seconds: 30, tolerance_s: 2, timed: true}
+  - {type: vla, label: flask_to_cooling, spec: "10.4",
+     instruction: "pick up the flask from the hot plate and place it on the cooling pad", max_duration: 40}
+  - {type: operator, label: cooled, prompt: "Confirm flask 1 is at room temperature"}
+
+  # 10.5: 100.0 mL 0.100 N iodine from the bottle-top dispenser, stopper, shake 30 +/- 1 s.
+  - {type: vla, label: flask_to_dispenser, spec: "10.5",
+     instruction: "pick up the flask from the cooling pad and hold it under the dispenser", max_duration: 30}
+  - {type: operator, label: iodine_added, prompt: "Dispense 100.0 mL iodine and seat the stopper"}
+  - {type: move, label: to_shake_pose, through: [shake_pose], segment_s: 1.5}
+  # J5 +/-10 deg at 2.5 Hz = 2.7 rad/s peak, about half the IRB 120's J5 rating.
+  - {type: shake, label: shake, spec: "10.5", joint: joint_5, amplitude_deg: 10, frequency_hz: 2.5,
+     duration_s: 30, ramp_s: 0.5, tolerance_s: 1, timed: true}
+  # "Quickly filter": go straight to the funnel and let the policy handle the pour.
+  # A single arm can't unstopper a flask it is holding, so the operator pulls the stopper for now.
+  - {type: move, label: to_funnel, through: [funnel_above], segment_s: 1.5}
+  - {type: operator, label: unstopper, prompt: "Remove the stopper from flask 1"}
+  - {type: vla, label: pour, spec: "10.5",
+     instruction: "pour the flask into the funnel", max_duration: 45}
+  - {type: move, label: return_home, through: [home], segment_s: 3.0}

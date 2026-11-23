@@ -1,0 +1,13 @@
+# Planning limits for the FAIRINO FR3 (robot:=fr3). Velocities from fairino3_v6.urdf (about
+# 180 deg/s); accelerations are conservative guesses until checked against the WebApp settings.
+default_velocity_scaling_factor: 0.2
+default_acceleration_scaling_factor: 0.2
+
+joint_limits:
+  joint_1: {has_velocity_limits: true, max_velocity: 3.15, has_acceleration_limits: true, max_acceleration: 8.0}
+  joint_2: {has_velocity_limits: true, max_velocity: 3.15, has_acceleration_limits: true, max_acceleration: 8.0}
+  joint_3: {has_velocity_limits: true, max_velocity: 3.15, has_acceleration_limits: true, max_acceleration: 8.0}
+  joint_4: {has_velocity_limits: true, max_velocity: 3.2, has_acceleration_limits: true, max_acceleration: 10.0}
+  joint_5: {has_velocity_limits: true, max_velocity: 3.2, has_acceleration_limits: true, max_acceleration: 10.0}
+  joint_6: {has_velocity_limits: true, max_velocity: 3.2, has_acceleration_limits: true, max_acceleration: 10.0}
+  gripper_joint: {has_velocity_limits: true, max_velocity: 0.1, has_acceleration_limits: true, max_acceleration: 1.0}
