@@ -2,7 +2,8 @@
 
 Run with Isaac Sim's Python (Isaac Sim 5.x, ROS 2 Jazzy sourced or the bundled Jazzy libs):
 
-    ./python.sh walter_isaac_scene.py --urdf /tmp/walter_isaac.urdf [--headless] [--seed 3]
+    ./python.sh walter_isaac_scene.py --usd ~/walter_sim/usd/fr3wms_ag145.usd [--headless] [--seed 3]   # Isaac Sim 6.x
+    ./python.sh walter_isaac_scene.py --urdf /tmp/walter_isaac.urdf --gripper-link gripper_body              # old 5.x path
 
 What it builds:
   * the cell URDF (bench + IRB 120 + placeholder gripper), position-driven joints
@@ -14,6 +15,11 @@ What it builds:
   * scene and wrist RGB cameras -> /scene_camera/image_raw, /wrist_camera/image_raw (15 Hz)
   * /clock, /isaac_joint_states (all joints), /isaac_joint_commands (arm), /isaac_gripper_commands
 
+ISAAC SIM 6.x NOTES (checked against the 6.0 migration guide, not run): isaacsim.core.api/prims/utils are
+deprecated but still work; ROS2PublishJointState.targetPrim, ROS2PublishTransformTree.targetPrims and
+ROS2CameraHelper.frameSkipCount are deprecated but still work (expect warnings). The URDF import commands
+below are only used with --urdf; on 6.x use --usd. Isaac Sim 6 runs Python 3.12.
+
 STATUS: written against the Isaac Sim 5.0 Python API and its ROS 2 bridge node names, NOT yet run
 (no Isaac Sim in the environment it was written in). Expect to fix a name or two on first launch;
 the OmniGraph wiring is the same as Isaac Sim's "ROS 2 Joint Control" tutorial.
@@ -22,7 +28,19 @@ the OmniGraph wiring is the same as Isaac Sim's "ROS 2 Joint Control" tutorial.
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--urdf", required=True, help="xacro walter_cell.urdf.xacro hardware:=isaac, see sim/isaac/README.md")
+src = parser.add_mutually_exclusive_group(required=True)
+src.add_argument("--usd", help="saved robot USD (FR3 WMS + AG-105-145 imported from fr3wms_ag145_cell.urdf); "
+                 "the recommended path on Isaac Sim 6.x, see the tutorial Step 1.3")
+src.add_argument("--urdf", help="legacy Isaac Sim 5.x path: import a URDF with the old URDF commands")
+parser.add_argument("--robot-prim", default="/World/fr3",
+                    help="with --usd: where to reference the robot (its articulation root must be this prim or "
+                         "--articulation-root)")
+parser.add_argument("--articulation-root", default=None,
+                    help="prim with ArticulationRootAPI if it is not --robot-prim (check the Property panel)")
+parser.add_argument("--gripper-link", default="gripper_base_link",
+                    help="prim path of the link the wrist camera hangs from, relative to --robot-prim (or to the "
+                         "articulation root with --urdf); check the Stage panel, newer importers may nest links "
+                         "deeper. gripper_body for the old placeholder cell")
 parser.add_argument("--headless", action="store_true")
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--camera-hz", type=float, default=15.0)
@@ -44,7 +62,8 @@ from isaacsim.core.utils.extensions import enable_extension  # noqa: E402
 from pxr import Gf, UsdGeom  # noqa: E402
 
 enable_extension("isaacsim.ros2.bridge")
-enable_extension("isaacsim.asset.importer.urdf")
+if args.urdf:
+    enable_extension("isaacsim.asset.importer.urdf")
 simulation_app.update()
 
 BENCH_TOP = 0.9  # must match bench_z in walter_cell.urdf.xacro
@@ -56,20 +75,33 @@ world.scene.add_default_ground_plane()
 stage = omni.usd.get_context().get_stage()
 
 # --- robot ------------------------------------------------------------------------------------
-_, cfg = omni.kit.commands.execute("URDFCreateImportConfig")
-cfg.merge_fixed_joints = False      # keep tcp / camera frames
-cfg.fix_base = True
-cfg.make_default_prim = False
-cfg.create_physics_scene = False    # World already made one
-cfg.import_inertia_tensor = True
-cfg.distance_scale = 1.0
-# Stiff position drives so joints track the commanded positions from ros2_control.
-cfg.default_drive_type = 1          # UrdfJointTargetType.JOINT_DRIVE_POSITION
-cfg.default_drive_strength = 1.0e5
-cfg.default_position_drive_damping = 1.0e3
-_, robot_path = omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=args.urdf, import_config=cfg,
-                                          get_articulation_root=True)
+if args.usd:
+    # Isaac Sim 6.x: import fr3wms_ag145_cell.urdf once in the GUI (Base Type: Source), set drives and
+    # colliders, save as USD, then reference it here. The bench mount is baked into that URDF.
+    from isaacsim.core.utils.stage import add_reference_to_stage  # deprecated in 6.x but still works
+    add_reference_to_stage(usd_path=args.usd, prim_path=args.robot_prim)
+    robot_path = args.articulation_root or args.robot_prim
+else:
+    _, cfg = omni.kit.commands.execute("URDFCreateImportConfig")
+    cfg.merge_fixed_joints = False      # keep tcp / camera frames
+    cfg.fix_base = True
+    cfg.make_default_prim = False
+    cfg.create_physics_scene = False    # World already made one
+    cfg.import_inertia_tensor = True
+    cfg.distance_scale = 1.0
+    # Stiff position drives so joints track the commanded positions from ros2_control.
+    cfg.default_drive_type = 1          # UrdfJointTargetType.JOINT_DRIVE_POSITION
+    cfg.default_drive_strength = 1.0e5
+    cfg.default_position_drive_damping = 1.0e3
+    _, robot_path = omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=args.urdf, import_config=cfg,
+                                              get_articulation_root=True)
 print(f"robot articulation at {robot_path}")
+if args.usd:
+    # The FR3 URDF has no bench (the old walter_cell xacro did), so add a bench top under the arm.
+    # 1.2 x 0.9 m, extending toward +x in world, where the 180-deg-yawed arm works.
+    world.scene.add(FixedCuboid(prim_path="/World/bench", name="bench",
+                                position=np.array([0.35, 0.0, BENCH_TOP - 0.02]),
+                                scale=np.array([1.2, 0.9, 0.04]), color=np.array([0.55, 0.45, 0.35])))
 
 # --- task objects (stand-ins; swap for real glassware USDs when you have them) --------------
 hotplate = world.scene.add(FixedCuboid(
@@ -102,7 +134,7 @@ def make_camera(path, translate, rotate_xyz_deg):
 # Scene camera: front of the bench looking back at the work area (same view as the spill PoC webcam).
 scene_cam = make_camera("/World/scene_camera", (0.95, 0.0, BENCH_TOP + 0.6), (55.0, 0.0, 90.0))
 # Wrist camera: child of the gripper body so it moves with the tool. USD cameras look down -Z.
-wrist_cam = make_camera(f"{robot_path}/gripper_body/wrist_camera", (0.045, 0.0, 0.03), (0.0, 180.0, 0.0))
+wrist_cam = make_camera(f"{args.robot_prim if args.usd else robot_path}/{args.gripper_link}/wrist_camera", (0.045, 0.0, 0.03), (0.0, 180.0, 0.0))
 
 # --- ROS 2 graph -----------------------------------------------------------------------------
 keys = og.Controller.Keys
