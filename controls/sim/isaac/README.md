@@ -18,7 +18,25 @@ Isaac Sim 5.x on Ubuntu 24.04 with ROS 2 Jazzy (Isaac Sim 5 supports Humble and 
 GPU is required. A 24 GB card is comfortable for the sim; GR00T fine-tuning wants a separate
 40 GB+ GPU or a cloud node.
 
-## Run
+## Run on Isaac Sim 6.x with the FR3 WMS + AG-105-145 (current setup)
+
+1. Import `controls/fr3wms_ag145_description/urdf/fr3wms_ag145_cell.urdf` once in the GUI (Base Type: Source),
+   set the joint drives and colliders, and save it as `~/walter_sim/usd/fr3wms_ag145.usd`. The tutorial's
+   Step 1.3 walks through it. The cell URDF bolts the arm to the bench at 0.90 m, yawed 180 deg.
+2. Start the scene from that USD:
+
+```bash
+~/isaacsim/python.sh walter_isaac_scene.py --usd ~/walter_sim/usd/fr3wms_ag145.usd --seed 1
+# if the console says the articulation root or wrist link is not found, look the prims up in the
+# Stage panel and pass --articulation-root /World/fr3/<...> and/or --gripper-link <...>/gripper_base_link
+```
+
+Isaac Sim 6 deprecates `isaacsim.core.api/prims/utils` and a few ROS 2 node inputs this script uses
+(`targetPrim`, `targetPrims`, `frameSkipCount`). They still work in 6.1, so expect deprecation warnings,
+not errors. The ROS side still needs the joint-name changes in the tutorial's Step 1.5 (`j1..j6`,
+`finger_joint`) before `bringup.launch.py` drives this robot.
+
+## Run (Isaac Sim 5.x, old IRB 120 / placeholder-gripper cell)
 
 ```bash
 # 1. Expand the cell for Isaac (absolute mesh paths, isaac ros2_control block)
@@ -28,7 +46,7 @@ xacro $(ros2 pkg prefix walter_description)/share/walter_description/urdf/walter
   > /tmp/walter_isaac.urdf
 
 # 2. Start the scene (Isaac Sim's python.sh; source ROS 2 Jazzy first or use Isaac's bundled libs)
-~/isaacsim/python.sh walter_isaac_scene.py --urdf /tmp/walter_isaac.urdf --seed 1
+~/isaacsim/python.sh walter_isaac_scene.py --urdf /tmp/walter_isaac.urdf --gripper-link gripper_body --seed 1
 
 # 3. Bring up the controls stack against the sim
 ros2 launch walter_bringup bringup.launch.py hardware:=isaac
@@ -42,7 +60,7 @@ xacro $(ros2 pkg prefix walter_description)/share/walter_description/urdf/walter
   | sed -e "s#package://walter_description#$(ros2 pkg prefix walter_description)/share/walter_description#g" \
         -e "s#package://fairino_description#$(ros2 pkg prefix fairino_description)/share/fairino_description#g" \
   > /tmp/walter_isaac_fr3.urdf
-~/isaacsim/python.sh walter_isaac_scene.py --urdf /tmp/walter_isaac_fr3.urdf --seed 1
+~/isaacsim/python.sh walter_isaac_scene.py --urdf /tmp/walter_isaac_fr3.urdf --gripper-link gripper_body --seed 1
 ros2 launch walter_bringup bringup.launch.py robot:=fr3 hardware:=isaac
 ```
 
